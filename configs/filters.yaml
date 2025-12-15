@@ -1,0 +1,183 @@
+# CodeRAG File Filter Configuration
+
+# Files to include in indexing (glob patterns)
+include:
+  # Python
+  - "*.py"
+  - "*.pyi"
+  - "*.pyx"
+
+  # JavaScript/TypeScript
+  - "*.js"
+  - "*.jsx"
+  - "*.ts"
+  - "*.tsx"
+  - "*.mjs"
+  - "*.cjs"
+
+  # Java/JVM
+  - "*.java"
+  - "*.kt"
+  - "*.kts"
+  - "*.scala"
+  - "*.groovy"
+
+  # Systems languages
+  - "*.go"
+  - "*.rs"
+  - "*.c"
+  - "*.cpp"
+  - "*.cc"
+  - "*.cxx"
+  - "*.h"
+  - "*.hpp"
+  - "*.hxx"
+
+  # Other languages
+  - "*.rb"
+  - "*.php"
+  - "*.cs"
+  - "*.swift"
+  - "*.m"
+  - "*.mm"
+
+  # Shell
+  - "*.sh"
+  - "*.bash"
+  - "*.zsh"
+  - "*.fish"
+
+  # Documentation
+  - "*.md"
+  - "*.rst"
+  - "*.txt"
+  - "*.adoc"
+
+  # Configuration
+  - "*.yaml"
+  - "*.yml"
+  - "*.json"
+  - "*.toml"
+  - "*.xml"
+  - "*.ini"
+  - "*.cfg"
+
+  # Web
+  - "*.html"
+  - "*.css"
+  - "*.scss"
+  - "*.sass"
+  - "*.less"
+
+  # SQL
+  - "*.sql"
+
+# Files/directories to exclude (glob patterns)
+exclude:
+  # Dependencies
+  - "**/node_modules/**"
+  - "**/vendor/**"
+  - "**/third_party/**"
+  - "**/.venv/**"
+  - "**/venv/**"
+  - "**/env/**"
+  - "**/.env/**"
+  - "**/virtualenv/**"
+
+  # Build artifacts
+  - "**/dist/**"
+  - "**/build/**"
+  - "**/out/**"
+  - "**/target/**"
+  - "**/.next/**"
+  - "**/.nuxt/**"
+  - "**/coverage/**"
+
+  # Cache
+  - "**/__pycache__/**"
+  - "**/.cache/**"
+  - "**/.pytest_cache/**"
+  - "**/.mypy_cache/**"
+  - "**/.ruff_cache/**"
+
+  # Version control
+  - "**/.git/**"
+  - "**/.svn/**"
+  - "**/.hg/**"
+
+  # IDE/Editor
+  - "**/.idea/**"
+  - "**/.vscode/**"
+  - "**/*.swp"
+  - "**/*.swo"
+  - "**/*~"
+
+  # Lock files
+  - "**/package-lock.json"
+  - "**/yarn.lock"
+  - "**/pnpm-lock.yaml"
+  - "**/poetry.lock"
+  - "**/Cargo.lock"
+  - "**/Gemfile.lock"
+  - "**/composer.lock"
+
+  # Minified files
+  - "**/*.min.js"
+  - "**/*.min.css"
+  - "**/*.bundle.js"
+
+  # Secrets and sensitive files (SECURITY)
+  - "**/.env"
+  - "**/.env.*"
+  - "**/credentials*"
+  - "**/*secret*"
+  - "**/*password*"
+  - "**/*.pem"
+  - "**/*.key"
+  - "**/*.p12"
+  - "**/*.pfx"
+  - "**/id_rsa*"
+  - "**/id_dsa*"
+  - "**/id_ecdsa*"
+  - "**/id_ed25519*"
+
+  # Binary/compiled
+  - "**/*.pyc"
+  - "**/*.pyo"
+  - "**/*.so"
+  - "**/*.dylib"
+  - "**/*.dll"
+  - "**/*.exe"
+  - "**/*.o"
+  - "**/*.a"
+  - "**/*.class"
+  - "**/*.jar"
+  - "**/*.war"
+
+  # Images/media
+  - "**/*.png"
+  - "**/*.jpg"
+  - "**/*.jpeg"
+  - "**/*.gif"
+  - "**/*.ico"
+  - "**/*.svg"
+  - "**/*.webp"
+  - "**/*.mp3"
+  - "**/*.mp4"
+  - "**/*.wav"
+  - "**/*.pdf"
+
+  # Archives
+  - "**/*.zip"
+  - "**/*.tar"
+  - "**/*.gz"
+  - "**/*.bz2"
+  - "**/*.xz"
+  - "**/*.rar"
+  - "**/*.7z"
+
+# Maximum file size in KB
+max_file_size_kb: 500
+
+# Skip empty files
+skip_empty: true

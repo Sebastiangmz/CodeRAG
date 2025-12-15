@@ -1,0 +1,79 @@
+# CodeRAG Default Configuration
+# Override with environment variables or .env file
+
+app:
+  name: CodeRAG
+  version: 0.1.0
+  debug: false
+
+server:
+  host: 0.0.0.0
+  port: 8000
+  reload: false
+  workers: 1
+  log_level: info
+
+data:
+  base_dir: ./data
+  repos_cache: ./data/repos
+  chroma_db: ./data/chroma_db
+
+ingestion:
+  max_file_size_kb: 500
+  default_branch: main
+  chunk_size: 1500
+  chunk_overlap: 200
+
+  include_patterns:
+    - "*.py"
+    - "*.js"
+    - "*.ts"
+    - "*.tsx"
+    - "*.jsx"
+    - "*.java"
+    - "*.go"
+    - "*.rs"
+    - "*.rb"
+    - "*.php"
+    - "*.c"
+    - "*.cpp"
+    - "*.h"
+    - "*.hpp"
+    - "*.cs"
+    - "*.md"
+    - "*.rst"
+    - "*.txt"
+    - "*.yaml"
+    - "*.yml"
+    - "*.json"
+    - "*.toml"
+
+  exclude_patterns:
+    - "**/node_modules/**"
+    - "**/.git/**"
+    - "**/venv/**"
+    - "**/__pycache__/**"
+    - "**/dist/**"
+    - "**/build/**"
+    - "**/*.min.js"
+    - "**/*.min.css"
+    - "**/package-lock.json"
+    - "**/yarn.lock"
+    - "**/poetry.lock"
+    - "**/Cargo.lock"
+    - "**/.env"
+    - "**/.env.*"
+    - "**/credentials*"
+    - "**/*secret*"
+    - "**/*password*"
+    - "**/*.pyc"
+    - "**/*.pyo"
+    - "**/*.so"
+    - "**/*.dylib"
+    - "**/*.dll"
+    - "**/*.exe"
+
+retrieval:
+  default_top_k: 5
+  max_top_k: 20
+  similarity_threshold: 0.3

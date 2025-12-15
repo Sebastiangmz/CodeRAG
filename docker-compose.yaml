@@ -1,0 +1,62 @@
+# CodeRAG Docker Compose Configuration
+# Usage: docker compose up
+
+services:
+  coderag:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: coderag
+    restart: unless-stopped
+
+    # NVIDIA GPU support
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+    ports:
+      - "8000:8000"
+
+    environment:
+      - DEBUG=false
+      - SERVER_HOST=0.0.0.0
+      - SERVER_PORT=8000
+      - SERVER_LOG_LEVEL=info
+      - MODEL_LLM_USE_4BIT=true
+      - VECTORSTORE_PERSIST_DIRECTORY=/app/data/chroma_db
+      - INGESTION_REPOS_CACHE_DIR=/app/data/repos
+
+    volumes:
+      # Persistent data storage
+      - coderag_chroma:/app/data/chroma_db
+      - coderag_repos:/app/data/repos
+      - coderag_hf_cache:/app/data/hf_cache
+      - coderag_torch_cache:/app/data/torch_cache
+
+      # Optional: Mount configs for customization
+      # - ./configs:/app/configs:ro
+
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s  # Models take time to load
+
+    # Resource limits
+    mem_limit: 16g
+    memswap_limit: 20g
+
+volumes:
+  coderag_chroma:
+    name: coderag_chroma_db
+  coderag_repos:
+    name: coderag_repos_cache
+  coderag_hf_cache:
+    name: coderag_hf_cache
+  coderag_torch_cache:
+    name: coderag_torch_cache

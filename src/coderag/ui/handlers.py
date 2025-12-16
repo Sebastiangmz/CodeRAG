@@ -52,7 +52,7 @@ class UIHandlers:
         data = [r.to_dict() for r in self.repositories.values()]
         self.repos_file.write_text(json.dumps(data, indent=2))
 
-    async def index_repository(
+    def index_repository(
         self,
         url: str,
         branch: str = "",
@@ -61,8 +61,8 @@ class UIHandlers:
     ) -> str:
         """Index a GitHub repository."""
         try:
-            # Validate URL
-            repo_info = await self.validator.validate_repository(url)
+            # Validate URL (sync version, skip accessibility check for UI)
+            repo_info = self.validator.parse_url(url)
             branch = branch.strip() or repo_info.branch or "main"
 
             # Create repository record

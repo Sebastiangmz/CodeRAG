@@ -1,5 +1,7 @@
 """CodeRAG main application entry point."""
 
+from contextlib import asynccontextmanager
+
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,6 +15,19 @@ setup_logging(level=settings.server.log_level.upper())
 logger = get_logger(__name__)
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan handler."""
+    logger.info(
+        "Starting CodeRAG",
+        app_name=settings.app_name,
+        version=settings.app_version,
+        debug=settings.debug,
+    )
+    yield
+    logger.info("Shutting down CodeRAG")
+
+
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
     app = FastAPI(
@@ -21,6 +36,7 @@ def create_app() -> FastAPI:
         description="RAG-based Q&A system for code repositories with verifiable citations",
         docs_url="/docs",
         redoc_url="/redoc",
+        lifespan=lifespan,
     )
 
     # CORS middleware
@@ -57,21 +73,8 @@ def create_app() -> FastAPI:
         logger.info("Gradio UI mounted at /")
     except ImportError as e:
         logger.warning("Gradio UI not available", error=str(e))
-
-    @app.on_event("startup")
-    async def startup_event() -> None:
-        """Application startup handler."""
-        logger.info(
-            "Starting CodeRAG",
-            app_name=settings.app_name,
-            version=settings.app_version,
-            debug=settings.debug,
-        )
-
-    @app.on_event("shutdown")
-    async def shutdown_event() -> None:
-        """Application shutdown handler."""
-        logger.info("Shutting down CodeRAG")
+    except Exception as e:
+        logger.error("Failed to mount Gradio UI", error=str(e))
 
     return app
 

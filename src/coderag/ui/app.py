@@ -11,10 +11,7 @@ def create_gradio_app() -> gr.Blocks:
     """Create the Gradio application."""
     handlers = UIHandlers()
 
-    with gr.Blocks(
-        title="CodeRAG - Code Q&A with Citations",
-        theme=gr.themes.Soft(),
-    ) as app:
+    with gr.Blocks(title="CodeRAG - Code Q&A with Citations") as app:
         gr.Markdown("# CodeRAG - Code Q&A with Citations")
         gr.Markdown("Index GitHub repositories and ask questions about the code with verifiable citations.")
 

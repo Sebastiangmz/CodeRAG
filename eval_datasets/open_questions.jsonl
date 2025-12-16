@@ -1,0 +1,5 @@
+{"question": "How does the system ensure responses are grounded in the codebase?", "type": "explanation", "expected_topics": ["citations", "system prompt", "retrieval"]}
+{"question": "What happens when a repository is indexed?", "type": "flow", "expected_topics": ["clone", "filter", "chunk", "embed", "store"]}
+{"question": "Explain the citation format used in responses", "type": "explanation", "expected_answer_contains": ["[file:start-end]", "file_path", "line numbers"]}
+{"question": "How are code chunks created from Python files?", "type": "explanation", "expected_topics": ["tree-sitter", "semantic", "function", "class"]}
+{"question": "What models are used for embeddings and generation?", "type": "configuration", "expected_answer_contains": ["nomic-embed", "Qwen2.5-Coder"]}

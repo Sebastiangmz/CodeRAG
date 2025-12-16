@@ -1,0 +1,5 @@
+{"question": "Where is the main entry point of the application defined?", "type": "location", "expected_citation_files": ["src/main.py"]}
+{"question": "What is the name of the function that validates GitHub URLs?", "type": "identification", "expected_answer_contains": ["validate", "parse_url"]}
+{"question": "Which file contains the Repository model?", "type": "location", "expected_citation_files": ["src/coderag/models/repository.py"]}
+{"question": "What parameters does the query endpoint accept?", "type": "api", "expected_answer_contains": ["question", "repo_id", "top_k"]}
+{"question": "Where is the ChromaDB client initialized?", "type": "location", "expected_citation_files": ["src/coderag/indexing/vectorstore.py"]}

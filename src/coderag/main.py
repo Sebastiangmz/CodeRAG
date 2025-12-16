@@ -50,9 +50,10 @@ def create_app() -> FastAPI:
     # Mount Gradio UI
     try:
         from coderag.ui.app import create_gradio_app
+        import gradio as gr
 
         gradio_app = create_gradio_app()
-        app = gradio_app.mount_gradio_app(app, gradio_app, path="/")
+        app = gr.mount_gradio_app(app, gradio_app, path="/")
         logger.info("Gradio UI mounted at /")
     except ImportError as e:
         logger.warning("Gradio UI not available", error=str(e))

@@ -1,44 +1,104 @@
-"""Response generation using Qwen2.5-Coder."""
+"""Response generation using local or remote LLMs."""
 
 from typing import Optional
-
-import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
 from coderag.config import get_settings
 from coderag.generation.citations import CitationParser
 from coderag.generation.prompts import SYSTEM_PROMPT, build_prompt, build_no_context_response
 from coderag.logging import get_logger
-from coderag.models.response import Citation, Query, Response, RetrievedChunk
+from coderag.models.response import Response
+from coderag.models.query import Query
 from coderag.retrieval.retriever import Retriever
 
 logger = get_logger(__name__)
 
 
 class ResponseGenerator:
-    """Generates grounded responses using Qwen2.5-Coder."""
+    """Generates grounded responses using local or remote LLMs."""
 
     def __init__(
         self,
         retriever: Optional[Retriever] = None,
-        model_name: Optional[str] = None,
     ) -> None:
-        settings = get_settings()
+        self.settings = get_settings()
         self.retriever = retriever or Retriever()
-        self.model_name = model_name or settings.models.llm_name
-        self.max_new_tokens = settings.models.llm_max_new_tokens
-        self.temperature = settings.models.llm_temperature
-        self.top_p = settings.models.llm_top_p
-        self.use_4bit = settings.models.llm_use_4bit
-
-        self._model = None
-        self._tokenizer = None
         self.citation_parser = CitationParser()
 
-    def _load_model(self) -> None:
-        logger.info("Loading LLM", model=self.model_name, use_4bit=self.use_4bit)
+        self.provider = self.settings.models.llm_provider.lower()
+        self._client = None
+        self._local_model = None
+        self._local_tokenizer = None
 
-        if self.use_4bit:
+        logger.info("ResponseGenerator initialized", provider=self.provider)
+
+    def _get_api_client(self):
+        """Get or create API client for remote providers."""
+        if self._client is not None:
+            return self._client
+
+        import httpx
+        from openai import OpenAI
+
+        api_key = self.settings.models.llm_api_key
+        if not api_key:
+            raise ValueError(f"API key required for provider: {self.provider}")
+
+        # Provider-specific configurations
+        provider_configs = {
+            "openai": {
+                "base_url": "https://api.openai.com/v1",
+                "default_model": "gpt-4o-mini",
+            },
+            "groq": {
+                "base_url": "https://api.groq.com/openai/v1",
+                "default_model": "llama-3.3-70b-versatile",
+            },
+            "anthropic": {
+                "base_url": "https://api.anthropic.com/v1",
+                "default_model": "claude-3-5-sonnet-20241022",
+            },
+            "openrouter": {
+                "base_url": "https://openrouter.ai/api/v1",
+                "default_model": "anthropic/claude-3.5-sonnet",
+            },
+            "together": {
+                "base_url": "https://api.together.xyz/v1",
+                "default_model": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+            },
+        }
+
+        config = provider_configs.get(self.provider, {})
+        base_url = self.settings.models.llm_api_base or config.get("base_url")
+
+        if not base_url:
+            raise ValueError(f"Unknown provider: {self.provider}")
+
+        # Set default model if not specified and it's a known provider
+        if self.settings.models.llm_name.startswith("Qwen/"):
+            self.model_name = config.get("default_model", self.settings.models.llm_name)
+        else:
+            self.model_name = self.settings.models.llm_name
+
+        self._client = OpenAI(
+            api_key=api_key,
+            base_url=base_url,
+            http_client=httpx.Client(timeout=120.0),
+        )
+
+        logger.info("API client created", provider=self.provider, model=self.model_name)
+        return self._client
+
+    def _load_local_model(self):
+        """Load local model with transformers."""
+        if self._local_model is not None:
+            return
+
+        import torch
+        from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+
+        logger.info("Loading local LLM", model=self.settings.models.llm_name)
+
+        if self.settings.models.llm_use_4bit:
             bnb_config = BitsAndBytesConfig(
                 load_in_4bit=True,
                 bnb_4bit_quant_type="nf4",
@@ -48,42 +108,23 @@ class ResponseGenerator:
         else:
             bnb_config = None
 
-        self._tokenizer = AutoTokenizer.from_pretrained(
-            self.model_name,
+        self._local_tokenizer = AutoTokenizer.from_pretrained(
+            self.settings.models.llm_name,
             trust_remote_code=True,
         )
 
-        self._model = AutoModelForCausalLM.from_pretrained(
-            self.model_name,
+        self._local_model = AutoModelForCausalLM.from_pretrained(
+            self.settings.models.llm_name,
             quantization_config=bnb_config,
-            device_map="auto",
+            device_map=self.settings.models.llm_device_map,
             trust_remote_code=True,
             torch_dtype=torch.float16,
         )
 
-        logger.info("LLM loaded successfully")
-
-    @property
-    def model(self):
-        if self._model is None:
-            self._load_model()
-        return self._model
-
-    @property
-    def tokenizer(self):
-        if self._tokenizer is None:
-            self._load_model()
-        return self._tokenizer
+        logger.info("Local LLM loaded successfully")
 
     def generate(self, query: Query) -> Response:
-        """Generate a response for a query.
-
-        Args:
-            query: The user's query
-
-        Returns:
-            Generated response with citations
-        """
+        """Generate a response for a query."""
         # Retrieve relevant chunks
         chunks, context = self.retriever.retrieve_with_context(
             query.question,
@@ -103,7 +144,11 @@ class ResponseGenerator:
 
         # Build prompt and generate
         prompt = build_prompt(query.question, context)
-        answer = self._generate_text(prompt)
+
+        if self.provider == "local":
+            answer = self._generate_local(prompt)
+        else:
+            answer = self._generate_api(prompt)
 
         # Parse citations from answer
         citations = self.citation_parser.parse_citations(answer)
@@ -119,45 +164,70 @@ class ResponseGenerator:
             query_id=query.id,
         )
 
-    def _generate_text(self, prompt: str) -> str:
-        """Generate text using the LLM."""
+    def _generate_api(self, prompt: str) -> str:
+        """Generate using remote API."""
+        client = self._get_api_client()
+
         messages = [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": prompt},
         ]
 
-        text = self.tokenizer.apply_chat_template(
+        response = client.chat.completions.create(
+            model=self.model_name,
+            messages=messages,
+            max_tokens=self.settings.models.llm_max_new_tokens,
+            temperature=self.settings.models.llm_temperature,
+            top_p=self.settings.models.llm_top_p,
+        )
+
+        return response.choices[0].message.content.strip()
+
+    def _generate_local(self, prompt: str) -> str:
+        """Generate using local model."""
+        import torch
+
+        self._load_local_model()
+
+        messages = [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": prompt},
+        ]
+
+        text = self._local_tokenizer.apply_chat_template(
             messages,
             tokenize=False,
             add_generation_prompt=True,
         )
 
-        inputs = self.tokenizer(text, return_tensors="pt").to(self.model.device)
+        inputs = self._local_tokenizer(text, return_tensors="pt").to(self._local_model.device)
 
         with torch.no_grad():
-            outputs = self.model.generate(
+            outputs = self._local_model.generate(
                 **inputs,
-                max_new_tokens=self.max_new_tokens,
-                temperature=self.temperature,
-                top_p=self.top_p,
+                max_new_tokens=self.settings.models.llm_max_new_tokens,
+                temperature=self.settings.models.llm_temperature,
+                top_p=self.settings.models.llm_top_p,
                 do_sample=True,
-                pad_token_id=self.tokenizer.eos_token_id,
+                pad_token_id=self._local_tokenizer.eos_token_id,
             )
 
-        # Decode only the generated part
         generated = outputs[0][inputs["input_ids"].shape[1]:]
-        response = self.tokenizer.decode(generated, skip_special_tokens=True)
+        response = self._local_tokenizer.decode(generated, skip_special_tokens=True)
 
         return response.strip()
 
     def unload(self) -> None:
-        """Unload model from memory."""
-        if self._model is not None:
-            del self._model
-            self._model = None
-        if self._tokenizer is not None:
-            del self._tokenizer
-            self._tokenizer = None
+        """Unload models from memory."""
+        if self._local_model is not None:
+            del self._local_model
+            self._local_model = None
+        if self._local_tokenizer is not None:
+            del self._local_tokenizer
+            self._local_tokenizer = None
+
+        import torch
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
-        logger.info("LLM unloaded")
+
+        logger.info("Models unloaded")

@@ -170,14 +170,15 @@ class UIHandlers:
             logger.error("Question failed", error=str(e))
             return "", "", f"Error: {str(e)}"
 
-    def get_repositories(self) -> list[tuple[str, str]]:
+    def get_repositories(self):
         """Get list of repositories for dropdown."""
+        import gradio as gr
         choices = []
         for repo in self.repositories.values():
             if repo.status == RepositoryStatus.READY:
                 label = f"{repo.full_name} ({repo.chunk_count} chunks)"
                 choices.append((label, repo.id))
-        return choices
+        return gr.update(choices=choices)
 
     def get_repositories_table(self) -> list[list]:
         """Get repositories as table data."""

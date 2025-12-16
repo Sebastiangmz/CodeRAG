@@ -37,31 +37,51 @@ class RepositoryLoader:
         progress_callback: Optional[ProgressCallback] = None,
     ) -> Path:
         repo_path = self.get_repo_path(repo_info)
-        branch = branch or repo_info.branch or "main"
+
+        # Try branches in order: specified, repo default, main, master
+        branches_to_try = []
+        if branch:
+            branches_to_try.append(branch)
+        if repo_info.branch and repo_info.branch not in branches_to_try:
+            branches_to_try.append(repo_info.branch)
+        if "main" not in branches_to_try:
+            branches_to_try.append("main")
+        if "master" not in branches_to_try:
+            branches_to_try.append("master")
 
         if repo_path.exists():
             logger.info("Repository exists, updating", path=str(repo_path))
-            return self._update_repository(repo_path, branch, progress_callback)
+            return self._update_repository(repo_path, branches_to_try[0], progress_callback)
 
-        logger.info("Cloning repository", url=repo_info.clone_url, branch=branch)
         if progress_callback:
             progress_callback("Cloning repository", 0)
 
-        try:
-            repo_path.parent.mkdir(parents=True, exist_ok=True)
-            Repo.clone_from(
-                repo_info.clone_url,
-                repo_path,
-                branch=branch,
-                depth=1,
-                single_branch=True,
-            )
-            if progress_callback:
-                progress_callback("Clone complete", 100)
-            logger.info("Repository cloned", path=str(repo_path))
-            return repo_path
-        except GitCommandError as e:
-            raise LoaderError(f"Failed to clone repository: {e}")
+        repo_path.parent.mkdir(parents=True, exist_ok=True)
+
+        last_error = None
+        for try_branch in branches_to_try:
+            try:
+                logger.info("Trying to clone", url=repo_info.clone_url, branch=try_branch)
+                Repo.clone_from(
+                    repo_info.clone_url,
+                    repo_path,
+                    branch=try_branch,
+                    depth=1,
+                    single_branch=True,
+                )
+                if progress_callback:
+                    progress_callback("Clone complete", 100)
+                logger.info("Repository cloned", path=str(repo_path), branch=try_branch)
+                return repo_path
+            except GitCommandError as e:
+                last_error = e
+                logger.debug("Branch not found, trying next", branch=try_branch)
+                # Clean up partial clone if any
+                import shutil
+                shutil.rmtree(repo_path, ignore_errors=True)
+                continue
+
+        raise LoaderError(f"Failed to clone repository (tried branches: {branches_to_try}): {last_error}")
 
     def _update_repository(
         self,

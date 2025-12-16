@@ -63,15 +63,20 @@ class VectorStore:
         documents = [chunk.content for chunk in chunks]
         metadatas = [chunk.to_dict() for chunk in chunks]
 
-        # Remove embedding from metadata (stored separately)
+        # Remove embedding and filter None values (ChromaDB doesn't accept None)
+        cleaned_metadatas = []
         for m in metadatas:
             m.pop("embedding", None)
+            m.pop("content", None)  # Already stored in documents
+            # Filter out None values - ChromaDB only accepts str, int, float, bool
+            cleaned = {k: v for k, v in m.items() if v is not None}
+            cleaned_metadatas.append(cleaned)
 
         self.collection.add(
             ids=ids,
             embeddings=embeddings,
             documents=documents,
-            metadatas=metadatas,
+            metadatas=cleaned_metadatas,
         )
 
         logger.info("Chunks added to vector store", count=len(chunks))

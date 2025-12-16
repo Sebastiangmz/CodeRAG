@@ -12,17 +12,27 @@ class ModelSettings(BaseSettings):
 
     model_config = SettingsConfigDict(env_prefix="MODEL_")
 
-    llm_name: str = "Qwen/Qwen2.5-Coder-7B-Instruct"
+    # LLM Provider: "local", "openai", "groq", "anthropic", "openrouter"
+    llm_provider: str = "local"
+
+    # API settings (for remote providers)
+    llm_api_key: Optional[str] = None
+    llm_api_base: Optional[str] = None  # Custom API base URL
+
+    # Model name (local or remote)
+    llm_name: str = "Qwen/Qwen2.5-Coder-3B-Instruct"
     llm_max_new_tokens: int = 1024
     llm_temperature: float = 0.1
     llm_top_p: float = 0.95
+
+    # Local model settings
     llm_use_4bit: bool = True
     llm_device_map: str = "auto"
 
     embedding_name: str = "nomic-ai/nomic-embed-text-v1.5"
     embedding_dimension: int = 768
     embedding_batch_size: int = 32
-    embedding_device: str = "cuda"
+    embedding_device: str = "cpu"  # CPU to leave GPU free for LLM
 
 
 class VectorStoreSettings(BaseSettings):

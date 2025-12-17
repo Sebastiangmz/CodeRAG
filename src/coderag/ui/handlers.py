@@ -62,6 +62,7 @@ class UIHandlers:
         """Index a GitHub repository."""
         try:
             # Validate URL (sync version, skip accessibility check for UI)
+            logger.info("Starting indexing", url=url, branch=branch)
             repo_info = self.validator.parse_url(url)
             branch = branch.strip() or repo_info.branch or "main"
 
@@ -74,6 +75,7 @@ class UIHandlers:
             self.repositories[repo.id] = repo
 
             # Clone repository
+            logger.info("Cloning repository", url=url, branch=branch)
             repo_path = self.loader.clone_repository(repo_info, branch)
             repo.clone_path = repo_path
             repo.status = RepositoryStatus.INDEXING
@@ -84,7 +86,10 @@ class UIHandlers:
             file_filter = FileFilter(include_patterns=include, exclude_patterns=exclude)
 
             # Process files
+            logger.info("Filtering files", repo_path=str(repo_path))
             files = list(file_filter.filter_files(repo_path))
+            logger.info("Files to process", count=len(files))
+
             documents = []
             for file_path in files:
                 try:
@@ -93,20 +98,31 @@ class UIHandlers:
                 except Exception as e:
                     logger.warning("Failed to load file", path=str(file_path), error=str(e))
 
+            logger.info("Documents loaded", count=len(documents))
+
             # Chunk documents
+            logger.info("Starting chunking")
             chunks = []
             for doc in documents:
                 for chunk in self.chunker.chunk_document(doc):
                     chunks.append(chunk)
 
+            logger.info("Chunking complete", chunk_count=len(chunks))
+
             # Generate embeddings and store
             if chunks:
                 # Delete existing chunks for this repo (re-indexing)
+                logger.info("Deleting previous chunks for repo", repo_id=repo.id)
                 self.vectorstore.delete_repo_chunks(repo.id)
 
                 # Embed in batches
+                logger.info("Starting embedding generation", chunk_count=len(chunks))
                 embedded_chunks = self.embedder.embed_chunks(chunks)
+                logger.info("Embeddings complete", embedded_count=len(embedded_chunks))
+
+                logger.info("Storing chunks in vector store")
                 self.vectorstore.add_chunks(embedded_chunks)
+                logger.info("Chunks stored successfully")
 
             # Update repository status
             repo.chunk_count = len(chunks)
@@ -114,12 +130,15 @@ class UIHandlers:
             repo.status = RepositoryStatus.READY
             self._save_repositories()
 
-            return f"Successfully indexed {repo_info.full_name}\n{len(files)} files processed\n{len(chunks)} chunks indexed"
+            result = f"Successfully indexed {repo_info.full_name}\n{len(files)} files processed\n{len(chunks)} chunks indexed"
+            logger.info("Indexing complete", result=result)
+            return result
 
         except ValidationError as e:
+            logger.error("Validation error", error=str(e))
             return f"Validation error: {str(e)}"
         except Exception as e:
-            logger.error("Indexing failed", error=str(e))
+            logger.error("Indexing failed", error=str(e), exc_info=True)
             if "repo" in locals():
                 repo.status = RepositoryStatus.ERROR
                 repo.error_message = str(e)

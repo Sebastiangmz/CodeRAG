@@ -100,4 +100,16 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        logger.info("Application interrupted by user")
+    except Exception as e:
+        logger.error("Application crashed", error=str(e), exc_info=True)
+        import traceback
+        print("\n" + "="*80)
+        print("FATAL ERROR:")
+        print("="*80)
+        traceback.print_exc()
+        print("="*80)
+        input("Press Enter to close...")  # Keep terminal open

@@ -58,7 +58,7 @@ class IngestionSettings(BaseSettings):
     chunk_overlap: int = 200
 
     include_patterns: list[str] = Field(
-        default_factory=lambda: ["*.py", "*.js", "*.ts", "*.java", "*.go", "*.rs", "*.md", "*.txt"]
+        default_factory=lambda: ["*.py", "*.js", "*.ts", "*.java", "*.go", "*.rs", "*.c", "*.cpp", "*.h"]
     )
     exclude_patterns: list[str] = Field(
         default_factory=lambda: [

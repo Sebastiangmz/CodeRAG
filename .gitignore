@@ -153,3 +153,15 @@ temp/
 eval_results/
 experiments/
 notebooks/
+
+# =============================================================================
+# AI Agent Configuration (Claude, Qwen, OpenSpec, SpecKit)
+# =============================================================================
+.claude/
+.qwen/
+.specify/
+openspec/
+specs/
+AGENTS.md
+CLAUDE.md
+QWEN.md

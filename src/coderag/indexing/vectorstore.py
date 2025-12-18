@@ -123,6 +123,34 @@ class VectorStore:
             return count
         return 0
 
+    def delete_file_chunks(self, repo_id: str, file_path: str) -> int:
+        """Delete chunks for a specific file in a repository (for incremental updates)."""
+        results = self.collection.get(
+            where={"$and": [{"repo_id": repo_id}, {"file_path": file_path}]},
+            include=[],
+        )
+
+        if results["ids"]:
+            self.collection.delete(ids=results["ids"])
+            count = len(results["ids"])
+            logger.info("Deleted file chunks", repo_id=repo_id, file_path=file_path, count=count)
+            return count
+        return 0
+
+    def get_indexed_files(self, repo_id: str) -> set[str]:
+        """Get set of file paths indexed for a repository."""
+        results = self.collection.get(
+            where={"repo_id": repo_id},
+            include=["metadatas"],
+        )
+
+        files = set()
+        if results["metadatas"]:
+            for metadata in results["metadatas"]:
+                if "file_path" in metadata:
+                    files.add(metadata["file_path"])
+        return files
+
     def get_repo_chunk_count(self, repo_id: str) -> int:
         results = self.collection.get(where={"repo_id": repo_id}, include=[])
         return len(results["ids"]) if results["ids"] else 0

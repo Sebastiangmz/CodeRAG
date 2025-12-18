@@ -24,6 +24,14 @@ ingestion:
   chunk_size: 1500
   chunk_overlap: 200
 
+  # Large repository handling
+  max_files_per_repo: 5000
+  max_total_chunks: 50000
+  batch_size: 100
+  stream_processing: true
+  warn_files_threshold: 1000
+  warn_chunks_threshold: 10000
+
   include_patterns:
     - "*.py"
     - "*.js"

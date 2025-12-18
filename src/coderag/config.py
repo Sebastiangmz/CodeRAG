@@ -31,8 +31,8 @@ class ModelSettings(BaseSettings):
 
     embedding_name: str = "nomic-ai/nomic-embed-text-v1.5"
     embedding_dimension: int = 768
-    embedding_batch_size: int = 32
-    embedding_device: str = "cpu"  # CPU to leave GPU free for LLM
+    embedding_batch_size: int = 8  # Reduced for 8GB VRAM GPUs
+    embedding_device: str = "cuda"  # GPU for faster embeddings
 
 
 class VectorStoreSettings(BaseSettings):
@@ -56,6 +56,16 @@ class IngestionSettings(BaseSettings):
     default_branch: str = "main"
     chunk_size: int = 1500
     chunk_overlap: int = 200
+
+    # Large repository handling
+    max_files_per_repo: int = 5000
+    max_total_chunks: int = 50000
+    batch_size: int = 100
+    stream_processing: bool = True
+
+    # Warning thresholds
+    warn_files_threshold: int = 1000
+    warn_chunks_threshold: int = 10000
 
     include_patterns: list[str] = Field(
         default_factory=lambda: ["*.py", "*.js", "*.ts", "*.java", "*.go", "*.rs", "*.c", "*.cpp", "*.h"]

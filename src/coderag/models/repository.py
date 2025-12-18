@@ -30,6 +30,7 @@ class Repository:
     chunk_count: int = 0
     status: RepositoryStatus = RepositoryStatus.PENDING
     error_message: Optional[str] = None
+    last_commit: Optional[str] = None  # SHA of last indexed commit (for incremental updates)
 
     @property
     def name(self) -> str:
@@ -58,6 +59,7 @@ class Repository:
             "chunk_count": self.chunk_count,
             "status": self.status.value,
             "error_message": self.error_message,
+            "last_commit": self.last_commit,
         }
 
     @classmethod
@@ -74,4 +76,5 @@ class Repository:
             chunk_count=data.get("chunk_count", 0),
             status=RepositoryStatus(data.get("status", "pending")),
             error_message=data.get("error_message"),
+            last_commit=data.get("last_commit"),
         )

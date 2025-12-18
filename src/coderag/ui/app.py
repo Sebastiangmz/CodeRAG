@@ -124,24 +124,37 @@ def create_gradio_app() -> gr.Blocks:
 
                 with gr.Row():
                     refresh_table_btn = gr.Button("Refresh", size="sm")
-                    delete_repo_id = gr.Textbox(
-                        label="Repository ID to delete",
-                        placeholder="Enter repository ID",
-                        scale=2,
-                    )
-                    delete_btn = gr.Button("Delete", variant="stop", size="sm")
 
-                delete_status = gr.Textbox(label="Status", interactive=False)
+                gr.Markdown("### Actions")
+
+                with gr.Row():
+                    with gr.Column(scale=2):
+                        action_repo_id = gr.Textbox(
+                            label="Repository ID",
+                            placeholder="Enter repository ID (or first 8 characters)",
+                            info="Copy the ID from the table above",
+                        )
+                    with gr.Column(scale=1):
+                        update_btn = gr.Button("Update (Incremental)", variant="secondary")
+                        delete_btn = gr.Button("Delete", variant="stop")
+
+                action_status = gr.Textbox(label="Status", interactive=False, lines=5)
 
                 refresh_table_btn.click(
                     fn=handlers.get_repositories_table,
                     outputs=[repos_table],
                 )
 
+                update_btn.click(
+                    fn=handlers.index_repository_incremental,
+                    inputs=[action_repo_id],
+                    outputs=[action_status],
+                )
+
                 delete_btn.click(
                     fn=handlers.delete_repository,
-                    inputs=[delete_repo_id],
-                    outputs=[delete_status, repos_table],
+                    inputs=[action_repo_id],
+                    outputs=[action_status, repos_table],
                 )
 
         # Load initial data

@@ -63,6 +63,19 @@ def create_app() -> FastAPI:
 
     app.include_router(api_router, prefix="/api/v1")
 
+    # Mount MCP server
+    try:
+        from coderag.mcp.server import create_mcp_server
+
+        mcp_server = create_mcp_server()
+        mcp_app = mcp_server.streamable_http_app()
+        app.mount("/mcp", mcp_app)
+        logger.info("MCP server mounted at /mcp")
+    except ImportError as e:
+        logger.warning("MCP server not available", error=str(e))
+    except Exception as e:
+        logger.error("Failed to mount MCP server", error=str(e))
+
     # Mount Gradio UI
     try:
         from coderag.ui.app import create_gradio_app

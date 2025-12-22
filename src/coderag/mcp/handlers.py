@@ -316,7 +316,7 @@ class MCPHandlers:
         # Get indexed files from vectorstore
         indexed_files: list[str] = []
         try:
-            files = self.vectorstore.get_repo_files(repo.id)
+            files = self.vectorstore.get_indexed_files(repo.id)
             indexed_files = list(files) if files else []
         except Exception:
             pass
@@ -494,10 +494,10 @@ class MCPHandlers:
 
         try:
             # Generate query embedding
-            query_embedding = self.embedder.embed_text(query)
+            query_embedding = self.embedder.generate_embedding(query, is_query=True)
 
-            # Search vectorstore
-            results = self.vectorstore.search(
+            # Search vectorstore (query returns list of (Chunk, score) tuples)
+            results = self.vectorstore.query(
                 query_embedding=query_embedding,
                 repo_id=repo.id,
                 top_k=top_k,
@@ -507,11 +507,11 @@ class MCPHandlers:
             if file_filter:
                 import fnmatch
 
-                results = [r for r in results if fnmatch.fnmatch(r.file_path, file_filter)]
+                results = [(chunk, score) for chunk, score in results if fnmatch.fnmatch(chunk.file_path, file_filter)]
 
             # Filter by chunk type if provided
             if chunk_type:
-                results = [r for r in results if r.chunk_type == chunk_type]
+                results = [(chunk, score) for chunk, score in results if chunk.chunk_type == chunk_type]
 
             return {
                 "results": [
@@ -521,9 +521,9 @@ class MCPHandlers:
                         "end_line": chunk.end_line,
                         "chunk_type": chunk.chunk_type,
                         "content": chunk.content,
-                        "relevance_score": round(chunk.relevance_score or 0, 3),
+                        "relevance_score": round(score, 3),
                     }
-                    for chunk in results[:top_k]
+                    for chunk, score in results[:top_k]
                 ],
                 "count": len(results),
             }

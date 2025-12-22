@@ -96,6 +96,14 @@ class ResponseGenerator:
         import torch
         from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
+        if not torch.cuda.is_available():
+            raise RuntimeError(
+                "Local LLM requires a CUDA-capable GPU. Options:\n"
+                "  1. Use a cloud provider (free): MODEL_LLM_PROVIDER=groq\n"
+                "     Get API key at: https://console.groq.com/keys\n"
+                "  2. Install CUDA and a compatible GPU"
+            )
+
         logger.info("Loading local LLM", model=self.settings.models.llm_name)
 
         if self.settings.models.llm_use_4bit:

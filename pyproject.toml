@@ -10,7 +10,7 @@ readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
 authors = [
-    { name = "Sebastian", email = "sebastian@example.com" }
+    { name = "Sebastian", email = "segamozi@gmail.com" }
 ]
 keywords = ["rag", "code", "qa", "llm", "embeddings", "chromadb"]
 classifiers = [
@@ -43,6 +43,7 @@ dependencies = [
     "einops>=0.8.0",
     "openai>=1.50.0",
     "mcp>=1.0.0",
+    "click>=8.1.0",
 ]
 
 [project.optional-dependencies]
@@ -57,7 +58,8 @@ dev = [
 ]
 
 [project.scripts]
-coderag = "coderag.main:main"
+coderag = "coderag.cli:main"
+coderag-mcp = "coderag.mcp.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/Sebastiangmz/CodeRAG"

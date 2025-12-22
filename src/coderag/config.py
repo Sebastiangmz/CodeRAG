@@ -13,7 +13,8 @@ class ModelSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="MODEL_")
 
     # LLM Provider: "local", "openai", "groq", "anthropic", "openrouter"
-    llm_provider: str = "local"
+    # Default to "groq" (free tier available, no GPU required)
+    llm_provider: str = "groq"
 
     # API settings (for remote providers)
     llm_api_key: Optional[str] = None
@@ -32,7 +33,7 @@ class ModelSettings(BaseSettings):
     embedding_name: str = "nomic-ai/nomic-embed-text-v1.5"
     embedding_dimension: int = 768
     embedding_batch_size: int = 8  # Reduced for 8GB VRAM GPUs
-    embedding_device: str = "cuda"  # GPU for faster embeddings
+    embedding_device: str = "auto"  # "auto" detects CUDA, falls back to CPU
 
 
 class VectorStoreSettings(BaseSettings):

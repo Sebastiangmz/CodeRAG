@@ -23,9 +23,18 @@ class EmbeddingGenerator:
     ) -> None:
         settings = get_settings()
         self.model_name = model_name or settings.models.embedding_name
-        self.device = device or settings.models.embedding_device
+        self.device = self._resolve_device(device or settings.models.embedding_device)
         self.batch_size = batch_size or settings.models.embedding_batch_size
         self._model: Optional[SentenceTransformer] = None
+
+    def _resolve_device(self, device: str) -> str:
+        """Resolve device, falling back to CPU if CUDA unavailable."""
+        if device == "auto":
+            return "cuda" if torch.cuda.is_available() else "cpu"
+        if device == "cuda" and not torch.cuda.is_available():
+            logger.warning("CUDA not available, falling back to CPU for embeddings")
+            return "cpu"
+        return device
 
     @property
     def model(self) -> SentenceTransformer:

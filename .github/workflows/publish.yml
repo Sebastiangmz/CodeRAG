@@ -46,7 +46,7 @@ jobs:
 
     environment:
       name: testpypi
-      url: https://test.pypi.org/p/coderag
+      url: https://test.pypi.org/p/code-rag-me
 
     permissions:
       id-token: write
@@ -71,7 +71,7 @@ jobs:
 
     environment:
       name: pypi
-      url: https://pypi.org/p/coderag
+      url: https://pypi.org/p/code-rag-me
 
     permissions:
       id-token: write

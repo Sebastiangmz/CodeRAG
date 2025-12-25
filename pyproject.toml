@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "coderag"
+name = "code-rag-me"
 version = "0.1.0"
 description = "RAG-based Q&A system for code repositories with verifiable citations"
 readme = "README.md"

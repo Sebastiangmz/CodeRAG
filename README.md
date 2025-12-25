@@ -1,16 +1,16 @@
 # CodeRAG - Code Q&A with Verifiable Citations
 
-[![PyPI version](https://badge.fury.io/py/coderag.svg)](https://badge.fury.io/py/coderag)
+[![PyPI version](https://badge.fury.io/py/code-rag-me.svg)](https://pypi.org/project/code-rag-me/)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 RAG-based Q&A system for code repositories that provides grounded answers with verifiable citations.
 
-## 🚀 Quick Start (No GPU Required)
+## 🚀 Quick Start
 
 ```bash
 # Install
-pip install coderag
+pip install code-rag-me
 
 # Configure (get free API key from https://console.groq.com/keys)
 coderag setup
@@ -19,7 +19,7 @@ coderag setup
 coderag serve
 ```
 
-That's it! Open http://localhost:8000 to use the web interface.
+Open http://localhost:8000 to use the web interface.
 
 ### Claude Desktop Integration (MCP)
 
@@ -56,16 +56,135 @@ coderag repos              # List indexed repositories
 coderag doctor             # Diagnose setup issues
 ```
 
-## 🔧 Installation Options
+## 🔧 Installation
 
-### Option 1: pip (Recommended)
+### Linux
 
+#### Arch Linux / Manjaro
+
+Arch Linux uses PEP 668 to protect system Python. Use one of these methods:
+
+**Option A: pipx (Recommended for CLI tools)**
 ```bash
-pip install coderag
-coderag setup
+sudo pacman -S python-pipx
+pipx install code-rag-me
 ```
 
-### Option 2: From Source
+**Option B: Virtual environment**
+```bash
+python -m venv ~/.local/share/coderag-venv
+source ~/.local/share/coderag-venv/bin/activate
+pip install code-rag-me
+```
+
+To always have `coderag` available, add to your `~/.bashrc` or `~/.zshrc`:
+```bash
+alias coderag="~/.local/share/coderag-venv/bin/coderag"
+```
+
+#### Debian / Ubuntu
+
+```bash
+# Install Python and pip
+sudo apt update
+sudo apt install python3 python3-pip python3-venv
+
+# Option A: pipx (Recommended)
+sudo apt install pipx
+pipx install code-rag-me
+
+# Option B: Virtual environment
+python3 -m venv ~/.local/share/coderag-venv
+source ~/.local/share/coderag-venv/bin/activate
+pip install code-rag-me
+```
+
+#### Fedora / RHEL / CentOS
+
+```bash
+# Install Python and pip
+sudo dnf install python3 python3-pip
+
+# Option A: pipx (Recommended)
+sudo dnf install pipx
+pipx install code-rag-me
+
+# Option B: Virtual environment
+python3 -m venv ~/.local/share/coderag-venv
+source ~/.local/share/coderag-venv/bin/activate
+pip install code-rag-me
+```
+
+#### Other Linux Distributions
+
+```bash
+# Create virtual environment
+python3 -m venv ~/.local/share/coderag-venv
+source ~/.local/share/coderag-venv/bin/activate
+pip install code-rag-me
+```
+
+### macOS
+
+**Option A: pipx (Recommended)**
+```bash
+# Install pipx via Homebrew
+brew install pipx
+pipx ensurepath
+pipx install code-rag-me
+```
+
+**Option B: Virtual environment**
+```bash
+python3 -m venv ~/.local/share/coderag-venv
+source ~/.local/share/coderag-venv/bin/activate
+pip install code-rag-me
+```
+
+**Option C: Homebrew Python**
+```bash
+brew install python@3.11
+pip3 install code-rag-me
+```
+
+### Windows
+
+#### Option A: pipx (Recommended)
+
+```powershell
+# Install pipx
+pip install pipx
+pipx ensurepath
+
+# Install CodeRAG
+pipx install code-rag-me
+```
+
+#### Option B: Virtual environment
+
+```powershell
+# Create virtual environment
+python -m venv %USERPROFILE%\coderag-venv
+
+# Activate (Command Prompt)
+%USERPROFILE%\coderag-venv\Scripts\activate.bat
+
+# Activate (PowerShell)
+& $env:USERPROFILE\coderag-venv\Scripts\Activate.ps1
+
+# Install
+pip install code-rag-me
+```
+
+#### Option C: Direct install (not recommended)
+
+```powershell
+pip install code-rag-me
+```
+
+> **Note**: On Windows, you may need to run PowerShell as Administrator or enable script execution with `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser`
+
+### From Source
 
 ```bash
 git clone https://github.com/Sebastiangmz/CodeRAG.git
@@ -74,13 +193,26 @@ pip install -e .
 coderag setup
 ```
 
-### Option 3: Docker
+### Docker
 
 ```bash
 git clone https://github.com/Sebastiangmz/CodeRAG.git
 cd CodeRAG
 docker compose up
 ```
+
+### Post-Installation
+
+After installing, configure your LLM provider:
+
+```bash
+coderag setup
+```
+
+This will prompt you to:
+1. Choose an LLM provider (Groq recommended - free tier available)
+2. Enter your API key (get one at https://console.groq.com/keys)
+3. Configure optional settings
 
 ## 📖 Usage Examples
 
@@ -240,10 +372,59 @@ Run diagnostics:
 coderag doctor
 ```
 
-Common issues:
-- **No API key**: Run `coderag setup` to configure
-- **CUDA errors**: Set `MODEL_EMBEDDING_DEVICE=cpu` or use cloud LLM
-- **Claude Desktop not detecting MCP**: Restart Claude Desktop after `mcp-install`
+### Common Issues
+
+#### `externally-managed-environment` error (Linux)
+
+```
+error: externally-managed-environment
+× This environment is externally managed
+```
+
+This happens on modern Linux distributions (Arch, Fedora 38+, Ubuntu 23.04+) that implement PEP 668. Solution: use `pipx` or a virtual environment. See the [Installation](#-installation) section for your distribution.
+
+#### No API key configured
+
+```bash
+coderag setup  # Run interactive setup
+```
+
+#### CUDA / GPU errors
+
+If you don't have a GPU or encounter CUDA errors:
+```bash
+export MODEL_EMBEDDING_DEVICE=cpu
+coderag serve
+```
+
+Or add to your `.env` file:
+```
+MODEL_EMBEDDING_DEVICE=cpu
+```
+
+#### Claude Desktop not detecting MCP
+
+1. Run `coderag mcp-install`
+2. Completely quit Claude Desktop (not just close the window)
+3. Restart Claude Desktop
+4. Check the MCP icon in Claude Desktop settings
+
+#### Permission denied on Linux/macOS
+
+```bash
+# If using pipx
+pipx ensurepath
+source ~/.bashrc  # or ~/.zshrc
+
+# If using venv, make sure it's activated
+source ~/.local/share/coderag-venv/bin/activate
+```
+
+#### PowerShell execution policy (Windows)
+
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
 
 ## 📄 License
 

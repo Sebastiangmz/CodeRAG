@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "code-rag-me"
-version = "0.1.0"
+version = "0.1.1"
 description = "RAG-based Q&A system for code repositories with verifiable citations"
 readme = "README.md"
 license = "MIT"

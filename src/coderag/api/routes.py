@@ -62,6 +62,33 @@ def save_repositories() -> None:
 load_repositories()
 
 
+def resolve_repo_id(partial_id: str) -> Optional[str]:
+    """Resolve a partial repository ID to a full ID.
+
+    Supports both full UUIDs and partial IDs (first 8+ characters).
+    Returns None if no match or multiple matches found.
+    """
+    # First try exact match
+    if partial_id in repositories:
+        return partial_id
+
+    # Try prefix match (minimum 8 characters recommended)
+    matches = [rid for rid in repositories.keys() if rid.startswith(partial_id)]
+
+    if len(matches) == 1:
+        return matches[0]
+
+    return None
+
+
+def get_repo_or_404(repo_id: str) -> Repository:
+    """Get a repository by ID (full or partial), raising 404 if not found."""
+    full_id = resolve_repo_id(repo_id)
+    if full_id is None:
+        raise HTTPException(status_code=404, detail="Repository not found")
+    return repositories[full_id]
+
+
 async def index_repository_task(
     url: str,
     repo_id: str,
@@ -166,12 +193,13 @@ async def index_repository(
 
 @router.post("/query", response_model=QueryResponse)
 async def query_repository(request: QueryRequest) -> QueryResponse:
-    """Query a repository."""
-    # Check repository exists
-    if request.repo_id not in repositories:
-        raise HTTPException(status_code=404, detail="Repository not found")
+    """Query a repository.
 
-    repo = repositories[request.repo_id]
+    Supports both full repository IDs and partial IDs (first 8+ characters).
+    """
+    # Check repository exists (supports partial IDs)
+    repo = get_repo_or_404(request.repo_id)
+
     if repo.status != RepositoryStatus.READY:
         raise HTTPException(
             status_code=400,
@@ -179,11 +207,11 @@ async def query_repository(request: QueryRequest) -> QueryResponse:
         )
 
     try:
-        # Generate response
+        # Generate response (use resolved repo.id for consistency)
         generator = ResponseGenerator()
         query = QueryModel(
             question=request.question,
-            repo_id=request.repo_id,
+            repo_id=repo.id,  # Use resolved full ID
             top_k=request.top_k,
         )
         response = generator.generate(query)
@@ -242,11 +270,11 @@ async def list_repositories() -> ListRepositoriesResponse:
 
 @router.get("/repos/{repo_id}", response_model=RepositoryInfo)
 async def get_repository(repo_id: str) -> RepositoryInfo:
-    """Get repository details."""
-    if repo_id not in repositories:
-        raise HTTPException(status_code=404, detail="Repository not found")
+    """Get repository details.
 
-    repo = repositories[repo_id]
+    Supports both full repository IDs and partial IDs (first 8+ characters).
+    """
+    repo = get_repo_or_404(repo_id)
     return RepositoryInfo(
         id=repo.id,
         url=repo.url,
@@ -260,19 +288,19 @@ async def get_repository(repo_id: str) -> RepositoryInfo:
 
 @router.delete("/repos/{repo_id}")
 async def delete_repository(repo_id: str) -> dict:
-    """Delete a repository."""
-    if repo_id not in repositories:
-        raise HTTPException(status_code=404, detail="Repository not found")
+    """Delete a repository.
 
-    repo = repositories[repo_id]
+    Supports both full repository IDs and partial IDs (first 8+ characters).
+    """
+    repo = get_repo_or_404(repo_id)
 
     try:
-        # Delete from vector store
+        # Delete from vector store (use resolved full ID)
         vectorstore = VectorStore()
-        vectorstore.delete_repo_chunks(repo_id)
+        vectorstore.delete_repo_chunks(repo.id)
 
-        # Delete from records
-        del repositories[repo_id]
+        # Delete from records (use resolved full ID)
+        del repositories[repo.id]
         save_repositories()
 
         return {"message": f"Repository {repo.full_name} deleted"}

@@ -412,6 +412,168 @@ def repos(output_format: str):
             click.echo(f"      Chunks: {repo['chunk_count']} | Indexed: {repo.get('indexed_at', 'N/A')}")
 
 
+@cli.command("update")
+@click.argument("repo_id")
+def update(repo_id: str):
+    """Update an indexed repository with latest changes.
+
+    REPO_ID: Repository ID (full or first 8 characters)
+
+    Fetches the latest changes from GitHub and re-indexes only the modified files.
+    This is faster than a full re-index for repositories with frequent updates.
+
+    Example: coderag update abc12345
+    """
+    # Apply config from file to environment
+    _apply_config_to_env()
+
+    import asyncio
+    from coderag.mcp.handlers import get_mcp_handlers
+
+    click.echo(f"\n🔄 Updating repository: {repo_id}\n")
+
+    handlers = get_mcp_handlers()
+
+    async def run_update():
+        result = await handlers.update_repository(repo_id=repo_id)
+        return result
+
+    result = asyncio.run(run_update())
+
+    if result.get("error"):
+        click.echo(f"❌ Error: {result['error']}")
+        sys.exit(1)
+
+    if result.get("message") == "Repository is already up to date":
+        click.echo("✅ Repository is already up to date!")
+    else:
+        click.echo("✅ Repository updated successfully!")
+        click.echo(f"   Files changed: {result.get('files_changed', 0)}")
+        click.echo(f"   - Added: {result.get('files_added', 0)}")
+        click.echo(f"   - Modified: {result.get('files_modified', 0)}")
+        click.echo(f"   - Deleted: {result.get('files_deleted', 0)}")
+        click.echo(f"   Chunks added: {result.get('chunks_added', 0)}")
+        click.echo(f"   Chunks deleted: {result.get('chunks_deleted', 0)}")
+        click.echo(f"   Total chunks: {result.get('total_chunks', 0)}")
+
+
+@cli.command("delete")
+@click.argument("repo_id")
+@click.option("--force", "-f", is_flag=True, help="Skip confirmation prompt")
+def delete(repo_id: str, force: bool):
+    """Delete an indexed repository.
+
+    REPO_ID: Repository ID (full or first 8 characters)
+
+    Removes the repository from the index and deletes all associated chunks
+    from the vector store.
+
+    Example: coderag delete abc12345
+    """
+    # Apply config from file to environment
+    _apply_config_to_env()
+
+    import asyncio
+    from coderag.mcp.handlers import get_mcp_handlers
+
+    handlers = get_mcp_handlers()
+
+    # First get repo info for confirmation
+    async def get_repo_info():
+        result = await handlers.get_repository_info(repo_id=repo_id)
+        return result
+
+    info = asyncio.run(get_repo_info())
+
+    if info.get("error"):
+        click.echo(f"❌ Error: {info['error']}")
+        sys.exit(1)
+
+    repo_name = info.get("name", repo_id)
+    chunk_count = info.get("chunk_count", 0)
+
+    if not force:
+        click.echo(f"\n⚠️  About to delete: {repo_name}")
+        click.echo(f"   Chunks to delete: {chunk_count}")
+        if not click.confirm("\nAre you sure?"):
+            click.echo("Cancelled.")
+            return
+
+    async def run_delete():
+        result = await handlers.delete_repository(repo_id=repo_id)
+        return result
+
+    result = asyncio.run(run_delete())
+
+    if result.get("error"):
+        click.echo(f"❌ Error: {result['error']}")
+        sys.exit(1)
+
+    click.echo(f"\n✅ Repository deleted: {result.get('name', repo_id)}")
+    click.echo(f"   Chunks removed: {result.get('chunks_deleted', 0)}")
+
+
+@cli.command("clean")
+@click.option("--force", "-f", is_flag=True, help="Skip confirmation prompt")
+def clean(force: bool):
+    """Clean up repositories with errors or stuck in indexing.
+
+    Removes all repositories that have status 'error' or have been stuck
+    in 'indexing' or 'pending' status for too long.
+
+    Example: coderag clean
+    """
+    # Apply config from file to environment
+    _apply_config_to_env()
+
+    import asyncio
+    from coderag.mcp.handlers import get_mcp_handlers
+
+    handlers = get_mcp_handlers()
+
+    async def get_repos():
+        result = await handlers.list_repositories()
+        return result
+
+    result = asyncio.run(get_repos())
+    repos = result.get("repositories", [])
+
+    # Find repos to clean
+    to_clean = [r for r in repos if r["status"] in ("error", "indexing", "pending")]
+
+    if not to_clean:
+        click.echo("\n✅ No repositories need cleaning.")
+        return
+
+    click.echo(f"\n🧹 Found {len(to_clean)} repository(ies) to clean:\n")
+    for repo in to_clean:
+        status_icon = "❌" if repo["status"] == "error" else "⏳"
+        click.echo(f"   {status_icon} {repo['id'][:8]}  {repo['name']} ({repo['status']})")
+
+    if not force:
+        if not click.confirm(f"\nDelete these {len(to_clean)} repositories?"):
+            click.echo("Cancelled.")
+            return
+
+    # Delete each repo
+    deleted = 0
+    for repo in to_clean:
+        async def run_delete():
+            return await handlers.delete_repository(repo_id=repo["id"])
+
+        try:
+            result = asyncio.run(run_delete())
+            if result.get("success"):
+                deleted += 1
+                click.echo(f"   ✅ Deleted: {repo['name']}")
+            else:
+                click.echo(f"   ❌ Failed: {repo['name']} - {result.get('error', 'Unknown')}")
+        except Exception as e:
+            click.echo(f"   ❌ Failed: {repo['name']} - {str(e)}")
+
+    click.echo(f"\n✅ Cleaned {deleted}/{len(to_clean)} repositories.")
+
+
 @cli.command("doctor")
 def doctor():
     """Diagnose common issues with CodeRAG setup.

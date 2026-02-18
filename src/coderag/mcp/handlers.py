@@ -74,13 +74,13 @@ class MCPHandlers:
         if not chunks:
             return 0
 
-        embedded = self.embedder.embed_chunks(chunks, show_progress=False)
-        self.vectorstore.add_chunks(embedded)
-
-        # Release memory
-        del embedded
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+        try:
+            embedded = self.embedder.embed_chunks(chunks, show_progress=False)
+            self.vectorstore.add_chunks(embedded)
+        finally:
+            # Always release memory, even on partial failure
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
 
         return len(chunks)
 

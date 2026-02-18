@@ -42,6 +42,9 @@ class GitHubURLValidator:
     """Validates and parses GitHub repository URLs."""
 
     GITHUB_PATTERNS = [
+        # https://github.com/owner/repo/tree/branch
+        r"^https?://github\.com/(?P<owner>[^/]+)/(?P<name>[^/]+?)/tree/(?P<branch>.+?)/?$",
+        # https://github.com/owner/repo(.git)?
         r"^https?://github\.com/(?P<owner>[^/]+)/(?P<name>[^/]+?)(?:\.git)?/?$",
         r"^git@github\.com:(?P<owner>[^/]+)/(?P<name>[^/]+?)(?:\.git)?$",
         r"^(?P<owner>[a-zA-Z0-9](?:[a-zA-Z0-9]|-(?=[a-zA-Z0-9])){0,38})/(?P<name>[a-zA-Z0-9._-]+)$",
@@ -58,9 +61,15 @@ class GitHubURLValidator:
             if match:
                 owner = match.group("owner")
                 name = match.group("name").rstrip(".git")
+                branch = match.groupdict().get("branch")
                 if not self._is_valid_name(owner) or not self._is_valid_name(name):
                     raise ValidationError(f"Invalid owner or repository name: {url}")
-                return GitHubRepoInfo(owner=owner, name=name, url=f"https://github.com/{owner}/{name}")
+                return GitHubRepoInfo(
+                    owner=owner,
+                    name=name,
+                    url=f"https://github.com/{owner}/{name}",
+                    branch=branch,
+                )
         raise ValidationError(f"Invalid GitHub URL: {url}. Expected: https://github.com/owner/repo")
 
     def _is_valid_name(self, name: str) -> bool:

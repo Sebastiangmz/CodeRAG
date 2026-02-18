@@ -32,8 +32,8 @@ class ModelSettings(BaseSettings):
 
     embedding_name: str = "nomic-ai/nomic-embed-text-v1.5"
     embedding_dimension: int = 768
-    embedding_batch_size: int = 8  # Reduced for 8GB VRAM GPUs
-    embedding_device: str = "auto"  # "auto" detects CUDA, falls back to CPU
+    embedding_batch_size: int = 4  # Conservative for 8GB VRAM GPUs with other processes
+    embedding_device: str = "auto"  # "auto" detects CUDA/VRAM, falls back to CPU
 
 
 class VectorStoreSettings(BaseSettings):

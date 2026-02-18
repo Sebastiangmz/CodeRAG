@@ -1,5 +1,6 @@
 """Embedding generation using nomic-embed-text."""
 
+import os
 from typing import Iterator, Optional
 
 import torch
@@ -10,6 +11,23 @@ from coderag.logging import get_logger
 from coderag.models.chunk import Chunk
 
 logger = get_logger(__name__)
+
+# Reduce CUDA memory fragmentation
+os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+
+# Minimum free VRAM (in MB) required to use GPU for embeddings
+_MIN_FREE_VRAM_MB = 512
+
+
+def _get_free_vram_mb() -> float:
+    """Return free VRAM in MB for the current CUDA device, or 0 if unavailable."""
+    if not torch.cuda.is_available():
+        return 0.0
+    try:
+        free, _total = torch.cuda.mem_get_info()
+        return free / (1024 * 1024)
+    except Exception:
+        return 0.0
 
 
 class EmbeddingGenerator:
@@ -28,9 +46,19 @@ class EmbeddingGenerator:
         self._model: Optional[SentenceTransformer] = None
 
     def _resolve_device(self, device: str) -> str:
-        """Resolve device, falling back to CPU if CUDA unavailable."""
+        """Resolve device, falling back to CPU if CUDA unavailable or low VRAM."""
         if device == "auto":
-            return "cuda" if torch.cuda.is_available() else "cpu"
+            if not torch.cuda.is_available():
+                return "cpu"
+            free_mb = _get_free_vram_mb()
+            if free_mb < _MIN_FREE_VRAM_MB:
+                logger.warning(
+                    "Low VRAM, using CPU for embeddings",
+                    free_vram_mb=round(free_mb, 1),
+                    min_required_mb=_MIN_FREE_VRAM_MB,
+                )
+                return "cpu"
+            return "cuda"
         if device == "cuda" and not torch.cuda.is_available():
             logger.warning("CUDA not available, falling back to CPU for embeddings")
             return "cpu"
@@ -44,12 +72,40 @@ class EmbeddingGenerator:
 
     def _load_model(self) -> None:
         logger.info("Loading embedding model", model=self.model_name, device=self.device)
-        self._model = SentenceTransformer(
-            self.model_name,
-            device=self.device,
-            trust_remote_code=True,
-        )
-        logger.info("Embedding model loaded")
+        try:
+            self._model = SentenceTransformer(
+                self.model_name,
+                device=self.device,
+                trust_remote_code=True,
+            )
+            logger.info("Embedding model loaded", device=self.device)
+        except (torch.cuda.OutOfMemoryError, RuntimeError) as e:
+            if "CUDA" in str(e) or "out of memory" in str(e):
+                logger.warning("CUDA OOM loading model, falling back to CPU", error=str(e))
+                torch.cuda.empty_cache()
+                self.device = "cpu"
+                self._model = SentenceTransformer(
+                    self.model_name,
+                    device="cpu",
+                    trust_remote_code=True,
+                )
+                logger.info("Embedding model loaded on CPU (fallback)")
+            else:
+                raise
+
+    def _encode_with_fallback(self, texts, **kwargs):
+        """Encode texts with automatic CPU fallback on CUDA OOM."""
+        try:
+            return self.model.encode(texts, **kwargs)
+        except (torch.cuda.OutOfMemoryError, RuntimeError) as e:
+            if "CUDA" not in str(e) and "out of memory" not in str(e):
+                raise
+            logger.warning("CUDA OOM during encoding, falling back to CPU")
+            torch.cuda.empty_cache()
+            # Move model to CPU and retry
+            self._model.to("cpu")
+            self.device = "cpu"
+            return self.model.encode(texts, **kwargs)
 
     def generate_embedding(self, text: str, is_query: bool = False) -> list[float]:
         # nomic-embed uses task prefixes
@@ -58,7 +114,9 @@ class EmbeddingGenerator:
         else:
             text = f"search_document: {text}"
 
-        embedding = self.model.encode(text, convert_to_numpy=True, normalize_embeddings=True)
+        embedding = self._encode_with_fallback(
+            text, convert_to_numpy=True, normalize_embeddings=True,
+        )
         return embedding.tolist()
 
     def generate_embeddings(
@@ -73,7 +131,7 @@ class EmbeddingGenerator:
         else:
             texts = [f"search_document: {t}" for t in texts]
 
-        embeddings = self.model.encode(
+        embeddings = self._encode_with_fallback(
             texts,
             batch_size=self.batch_size,
             convert_to_numpy=True,

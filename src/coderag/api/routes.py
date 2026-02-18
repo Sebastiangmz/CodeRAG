@@ -97,7 +97,10 @@ async def index_repository_task(
     exclude_patterns: Optional[list[str]],
 ) -> None:
     """Background task to index a repository."""
+    import torch
+
     repo = repositories[repo_id]
+    embedder = None
 
     try:
         # Validate and clone
@@ -119,44 +122,57 @@ async def index_repository_task(
         )
         files = list(file_filter.filter_files(repo_path))
 
-        # Load documents
-        documents = []
+        # Process in batches to avoid CUDA OOM
+        vectorstore = VectorStore()
+        vectorstore.delete_repo_chunks(repo.id)
+        embedder = EmbeddingGenerator()
+        chunker = CodeChunker()
+
+        batch_size = settings.ingestion.batch_size
+        total_chunks = 0
+        batch: list = []
+
         for file_path in files:
             try:
                 doc = Document.from_file(file_path, repo_path, repo.id)
-                documents.append(doc)
+                for chunk in chunker.chunk_document(doc):
+                    chunk.repo_id = repo.id
+                    batch.append(chunk)
+
+                    if len(batch) >= batch_size:
+                        embedded = embedder.embed_chunks(batch, show_progress=False)
+                        vectorstore.add_chunks(embedded)
+                        total_chunks += len(batch)
+                        del embedded
+                        if torch.cuda.is_available():
+                            torch.cuda.empty_cache()
+                        batch = []
             except Exception as e:
-                logger.warning("Failed to load file", path=str(file_path), error=str(e))
+                logger.warning("Failed to process file", path=str(file_path), error=str(e))
 
-        # Chunk
-        chunker = CodeChunker()
-        chunks = []
-        for doc in documents:
-            for chunk in chunker.chunk_document(doc):
-                chunks.append(chunk)
-
-        # Embed and store
-        if chunks:
-            vectorstore = VectorStore()
-            vectorstore.delete_repo_chunks(repo.id)
-
-            embedder = EmbeddingGenerator()
-            embedded_chunks = embedder.embed_chunks(chunks)
-            vectorstore.add_chunks(embedded_chunks)
+        # Process final batch
+        if batch:
+            embedded = embedder.embed_chunks(batch, show_progress=False)
+            vectorstore.add_chunks(embedded)
+            total_chunks += len(batch)
+            del embedded
 
         # Update status
-        repo.chunk_count = len(chunks)
+        repo.chunk_count = total_chunks
         repo.indexed_at = datetime.now()
         repo.status = RepositoryStatus.READY
         save_repositories()
 
-        logger.info("Repository indexed", repo_id=repo_id, chunks=len(chunks))
+        logger.info("Repository indexed", repo_id=repo_id, chunks=total_chunks)
 
     except Exception as e:
         logger.error("Indexing failed", repo_id=repo_id, error=str(e))
         repo.status = RepositoryStatus.ERROR
         repo.error_message = str(e)
         save_repositories()
+    finally:
+        if embedder is not None:
+            embedder.unload()
 
 
 @router.post("/repos/index", response_model=IndexRepositoryResponse, status_code=202)

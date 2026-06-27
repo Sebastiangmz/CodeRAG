@@ -121,6 +121,186 @@
           }
         ]
       }
+    },
+    {
+      "schema_version": "evalfly.case.v1",
+      "case_id": "m1-service-contract-exists",
+      "title": "Milestone 1 service seam contract exists",
+      "suite": "smoke",
+      "risk_tier": "critical",
+      "task_type": "delivery_governance",
+      "source": {
+        "kind": "acceptance_criteria",
+        "criteria": "M1-AC5"
+      },
+      "privacy": {
+        "classification": "public",
+        "sanitized": true
+      },
+      "expected": {
+        "success_criteria": [
+          "docs/superpowers/plans/2026-06-27-m1-service-seam-contract.md is present for Milestone 1 governance."
+        ]
+      },
+      "judge": {
+        "type": "deterministic",
+        "assertions": [
+          {
+            "type": "file_exists",
+            "path": "docs/superpowers/plans/2026-06-27-m1-service-seam-contract.md"
+          }
+        ]
+      }
+    },
+    {
+      "schema_version": "evalfly.case.v1",
+      "case_id": "m1-registry-service-exists",
+      "title": "Repository registry service exists",
+      "suite": "smoke",
+      "risk_tier": "critical",
+      "task_type": "service_seam",
+      "source": {
+        "kind": "acceptance_criteria",
+        "criteria": "M1-AC1"
+      },
+      "privacy": {
+        "classification": "public",
+        "sanitized": true
+      },
+      "expected": {
+        "success_criteria": [
+          "src/coderag/services/registry.py is present for Milestone 1 governance."
+        ]
+      },
+      "judge": {
+        "type": "deterministic",
+        "assertions": [
+          {
+            "type": "file_exists",
+            "path": "src/coderag/services/registry.py"
+          }
+        ]
+      }
+    },
+    {
+      "schema_version": "evalfly.case.v1",
+      "case_id": "m1-indexing-service-exists",
+      "title": "Indexing service exists",
+      "suite": "smoke",
+      "risk_tier": "critical",
+      "task_type": "service_seam",
+      "source": {
+        "kind": "acceptance_criteria",
+        "criteria": "M1-AC2"
+      },
+      "privacy": {
+        "classification": "public",
+        "sanitized": true
+      },
+      "expected": {
+        "success_criteria": [
+          "src/coderag/services/indexing.py is present for Milestone 1 governance."
+        ]
+      },
+      "judge": {
+        "type": "deterministic",
+        "assertions": [
+          {
+            "type": "file_exists",
+            "path": "src/coderag/services/indexing.py"
+          }
+        ]
+      }
+    },
+    {
+      "schema_version": "evalfly.case.v1",
+      "case_id": "m1-retrieval-service-exists",
+      "title": "Retrieval service exists",
+      "suite": "smoke",
+      "risk_tier": "critical",
+      "task_type": "service_seam",
+      "source": {
+        "kind": "acceptance_criteria",
+        "criteria": "M1-AC3"
+      },
+      "privacy": {
+        "classification": "public",
+        "sanitized": true
+      },
+      "expected": {
+        "success_criteria": [
+          "src/coderag/services/retrieval.py is present for Milestone 1 governance."
+        ]
+      },
+      "judge": {
+        "type": "deterministic",
+        "assertions": [
+          {
+            "type": "file_exists",
+            "path": "src/coderag/services/retrieval.py"
+          }
+        ]
+      }
+    },
+    {
+      "schema_version": "evalfly.case.v1",
+      "case_id": "m1-service-tests-exist",
+      "title": "Milestone 1 service tests exist",
+      "suite": "smoke",
+      "risk_tier": "critical",
+      "task_type": "test_coverage",
+      "source": {
+        "kind": "acceptance_criteria",
+        "criteria": "M1-AC1 M1-AC2 M1-AC3 M1-AC4"
+      },
+      "privacy": {
+        "classification": "public",
+        "sanitized": true
+      },
+      "expected": {
+        "success_criteria": [
+          "tests/test_m1_services.py is present for Milestone 1 governance."
+        ]
+      },
+      "judge": {
+        "type": "deterministic",
+        "assertions": [
+          {
+            "type": "file_exists",
+            "path": "tests/test_m1_services.py"
+          }
+        ]
+      }
+    },
+    {
+      "schema_version": "evalfly.case.v1",
+      "case_id": "m1-api-route-tests-exist",
+      "title": "Milestone 1 API route seam tests exist",
+      "suite": "smoke",
+      "risk_tier": "critical",
+      "task_type": "test_coverage",
+      "source": {
+        "kind": "acceptance_criteria",
+        "criteria": "M1-AC1 M1-AC2 M1-AC3"
+      },
+      "privacy": {
+        "classification": "public",
+        "sanitized": true
+      },
+      "expected": {
+        "success_criteria": [
+          "tests/test_api_routes.py is present for Milestone 1 governance."
+        ]
+      },
+      "judge": {
+        "type": "deterministic",
+        "assertions": [
+          {
+            "type": "file_exists",
+            "path": "tests/test_api_routes.py"
+          }
+        ]
+      }
     }
   ]
 }

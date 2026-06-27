@@ -23,19 +23,19 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install build
           python -m pip install -e . --no-deps
-          python -m pip install pytest pydantic pydantic-settings click PyYAML fastapi structlog ruff mypy
+          python -m pip install pytest pytest-asyncio pydantic pydantic-settings click PyYAML fastapi structlog ruff mypy mcp httpx
 
-      - name: Run Milestone 0 tests
-        run: PYTHONPATH=src python -m pytest tests/test_m0_baseline.py
+      - name: Run Milestone 0 and 1 tests
+        run: PYTHONPATH=src python -m pytest tests/test_m0_baseline.py tests/test_m1_services.py tests/test_api_routes.py tests/test_mcp_handlers.py tests/test_mcp_tools.py tests/test_ui_handlers.py
 
-      - name: Run Milestone 0 lint baseline
-        run: ruff check tests/test_m0_baseline.py scripts/evalfly_smoke.py
+      - name: Run Milestone 0 and 1 lint baseline
+        run: ruff check src/coderag/services src/coderag/config.py src/coderag/api/routes.py src/coderag/mcp/handlers.py src/coderag/mcp/tools.py src/coderag/ui/repository_metadata.py tests/test_m0_baseline.py tests/test_m1_services.py tests/test_api_routes.py tests/test_mcp_handlers.py tests/test_mcp_tools.py tests/test_ui_handlers.py scripts/evalfly_smoke.py
 
-      - name: Run Milestone 0 type baseline
-        run: PYTHONPATH=src mypy tests/test_m0_baseline.py scripts/evalfly_smoke.py
+      - name: Run Milestone 0 and 1 type baseline
+        run: PYTHONPATH=src mypy src/coderag/services src/coderag/config.py src/coderag/ui/repository_metadata.py tests/test_m0_baseline.py tests/test_m1_services.py tests/test_api_routes.py scripts/evalfly_smoke.py
 
       - name: Compile changed runtime modules
-        run: python -m py_compile src/coderag/__init__.py src/coderag/config.py src/coderag/main.py src/coderag/cli.py src/coderag/indexing/embeddings.py src/coderag/generation/generator.py tests/test_m0_baseline.py scripts/evalfly_smoke.py
+        run: python -m py_compile src/coderag/__init__.py src/coderag/config.py src/coderag/main.py src/coderag/cli.py src/coderag/indexing/embeddings.py src/coderag/generation/generator.py src/coderag/services/*.py src/coderag/api/routes.py src/coderag/mcp/handlers.py src/coderag/ui/repository_metadata.py src/coderag/ui/handlers.py tests/test_m0_baseline.py tests/test_m1_services.py tests/test_api_routes.py tests/test_ui_handlers.py scripts/evalfly_smoke.py
 
       - name: Build package
         run: python -m build

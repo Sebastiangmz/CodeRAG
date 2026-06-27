@@ -1,0 +1,70 @@
+{
+  "schema_version": "evalfly.run.v1",
+  "run_id": "run-smoke-20260627203451",
+  "suite": "smoke",
+  "config_name": "CodeRAG Milestone 0 baseline smoke suite",
+  "created_at": "2026-06-27T20:34:51.248Z",
+  "context": {
+    "spec_slice": "CRAG-20260627-M0-REVIEW-FIXES",
+    "session_id": "omp-session",
+    "commit_range": "main..HEAD",
+    "eval_report_path": "evals/reports/run-smoke-20260627203451.md"
+  },
+  "results": [
+    {
+      "case_id": "m0-roadmap-contract-exists",
+      "title": "Milestone 0 acceptance contract exists",
+      "risk_tier": "critical",
+      "critical": true,
+      "passed": true,
+      "privacy": {
+        "classification": "public",
+        "sanitized": true
+      },
+      "errors": []
+    },
+    {
+      "case_id": "m0-targeted-tests-exist",
+      "title": "Milestone 0 targeted tests exist",
+      "risk_tier": "critical",
+      "critical": true,
+      "passed": true,
+      "privacy": {
+        "classification": "public",
+        "sanitized": true
+      },
+      "errors": []
+    },
+    {
+      "case_id": "m0-ci-workflow-exists",
+      "title": "CI validation workflow exists",
+      "risk_tier": "critical",
+      "critical": true,
+      "passed": true,
+      "privacy": {
+        "classification": "public",
+        "sanitized": true
+      },
+      "errors": []
+    },
+    {
+      "case_id": "m0-committed-evalfly-runner-exists",
+      "title": "Committed EvalFly smoke runner exists",
+      "risk_tier": "critical",
+      "critical": true,
+      "passed": true,
+      "privacy": {
+        "classification": "public",
+        "sanitized": true
+      },
+      "errors": []
+    }
+  ],
+  "summary": {
+    "total": 4,
+    "passed": 4,
+    "failed": 0,
+    "critical_regressions": 0
+  },
+  "verdict": "pass"
+}

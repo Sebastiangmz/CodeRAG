@@ -1,0 +1,126 @@
+{
+  "schema_version": "evalfly.config.v1",
+  "name": "CodeRAG Milestone 0 baseline smoke suite",
+  "cases": [
+    {
+      "schema_version": "evalfly.case.v1",
+      "case_id": "m0-roadmap-contract-exists",
+      "title": "Milestone 0 acceptance contract exists",
+      "suite": "smoke",
+      "risk_tier": "critical",
+      "task_type": "delivery_governance",
+      "source": {
+        "kind": "specsafe_slice",
+        "slice_id": "CRAG-20260627-M0-BASELINE"
+      },
+      "privacy": {
+        "classification": "public",
+        "sanitized": true
+      },
+      "expected": {
+        "success_criteria": [
+          "The Milestone 0 acceptance and evidence contract is present in the repository."
+        ]
+      },
+      "judge": {
+        "type": "deterministic",
+        "assertions": [
+          {
+            "type": "file_exists",
+            "path": "docs/superpowers/plans/2026-06-27-m0-baseline-contract.md"
+          }
+        ]
+      }
+    },
+    {
+      "schema_version": "evalfly.case.v1",
+      "case_id": "m0-targeted-tests-exist",
+      "title": "Milestone 0 targeted tests exist",
+      "suite": "smoke",
+      "risk_tier": "critical",
+      "task_type": "test_coverage",
+      "source": {
+        "kind": "acceptance_criteria",
+        "criteria": "M0-AC2 M0-AC3 M0-AC4"
+      },
+      "privacy": {
+        "classification": "public",
+        "sanitized": true
+      },
+      "expected": {
+        "success_criteria": [
+          "The targeted baseline tests for version, safe defaults, and secret redaction exist."
+        ]
+      },
+      "judge": {
+        "type": "deterministic",
+        "assertions": [
+          {
+            "type": "file_exists",
+            "path": "tests/test_m0_baseline.py"
+          }
+        ]
+      }
+    },
+    {
+      "schema_version": "evalfly.case.v1",
+      "case_id": "m0-ci-workflow-exists",
+      "title": "CI validation workflow exists",
+      "suite": "smoke",
+      "risk_tier": "critical",
+      "task_type": "ci_baseline",
+      "source": {
+        "kind": "acceptance_criteria",
+        "criteria": "M0-AC5"
+      },
+      "privacy": {
+        "classification": "public",
+        "sanitized": true
+      },
+      "expected": {
+        "success_criteria": [
+          "A non-publish GitHub Actions workflow exists for validation gates."
+        ]
+      },
+      "judge": {
+        "type": "deterministic",
+        "assertions": [
+          {
+            "type": "file_exists",
+            "path": ".github/workflows/ci.yml"
+          }
+        ]
+      }
+    },
+    {
+      "schema_version": "evalfly.case.v1",
+      "case_id": "m0-committed-evalfly-runner-exists",
+      "title": "Committed EvalFly smoke runner exists",
+      "suite": "smoke",
+      "risk_tier": "critical",
+      "task_type": "ci_baseline",
+      "source": {
+        "kind": "review_finding",
+        "finding": "CI must run a semantic smoke check, not only JSON syntax"
+      },
+      "privacy": {
+        "classification": "public",
+        "sanitized": true
+      },
+      "expected": {
+        "success_criteria": [
+          "A committed deterministic runner exists for CI to execute EvalFly smoke file_exists assertions."
+        ]
+      },
+      "judge": {
+        "type": "deterministic",
+        "assertions": [
+          {
+            "type": "file_exists",
+            "path": "scripts/evalfly_smoke.py"
+          }
+        ]
+      }
+    }
+  ]
+}

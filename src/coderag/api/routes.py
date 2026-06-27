@@ -1,178 +1,58 @@
 """REST API routes."""
 
-import json
-from datetime import datetime
-from typing import Optional
-
-from fastapi import APIRouter, HTTPException, BackgroundTasks
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, BackgroundTasks, HTTPException
 
 from coderag.api.schemas import (
+    CitationResponse,
     IndexRepositoryRequest,
     IndexRepositoryResponse,
+    ListRepositoriesResponse,
     QueryRequest,
     QueryResponse,
-    ListRepositoriesResponse,
     RepositoryInfo,
-    CitationResponse,
     RetrievedChunkResponse,
-    ErrorResponse,
 )
-from coderag.config import get_settings
-from coderag.generation.generator import ResponseGenerator
-from coderag.indexing.embeddings import EmbeddingGenerator
-from coderag.indexing.vectorstore import VectorStore
-from coderag.ingestion.chunker import CodeChunker
-from coderag.ingestion.filter import FileFilter
-from coderag.ingestion.loader import RepositoryLoader
-from coderag.ingestion.validator import GitHubURLValidator, ValidationError
 from coderag.logging import get_logger
-from coderag.models.document import Document
-from coderag.models.query import Query as QueryModel
-from coderag.models.repository import Repository, RepositoryStatus
+from coderag.services.indexing import IndexingOptions, IndexingService
+from coderag.services.registry import RepositoryRegistry
+from coderag.services.retrieval import RetrievalService
 
 logger = get_logger(__name__)
 router = APIRouter()
 
-# Global state (in production, use a proper database)
-settings = get_settings()
-repos_file = settings.data_dir / "repositories.json"
-repositories: dict[str, Repository] = {}
+registry = RepositoryRegistry()
+indexing_service = IndexingService(registry=registry)
+retrieval_service = RetrievalService(registry=registry)
 
 
-def load_repositories() -> None:
-    """Load repositories from disk."""
-    global repositories
-    if repos_file.exists():
-        try:
-            data = json.loads(repos_file.read_text())
-            repositories = {r["id"]: Repository.from_dict(r) for r in data}
-        except Exception as e:
-            logger.error("Failed to load repositories", error=str(e))
-
-
-def save_repositories() -> None:
-    """Save repositories to disk."""
-    repos_file.parent.mkdir(parents=True, exist_ok=True)
-    data = [r.to_dict() for r in repositories.values()]
-    repos_file.write_text(json.dumps(data, indent=2))
-
-
-# Load on startup
-load_repositories()
-
-
-def resolve_repo_id(partial_id: str) -> Optional[str]:
-    """Resolve a partial repository ID to a full ID.
-
-    Supports both full UUIDs and partial IDs (first 8+ characters).
-    Returns None if no match or multiple matches found.
-    """
-    # First try exact match
-    if partial_id in repositories:
-        return partial_id
-
-    # Try prefix match (minimum 8 characters recommended)
-    matches = [rid for rid in repositories.keys() if rid.startswith(partial_id)]
-
-    if len(matches) == 1:
-        return matches[0]
-
-    return None
-
-
-def get_repo_or_404(repo_id: str) -> Repository:
-    """Get a repository by ID (full or partial), raising 404 if not found."""
-    full_id = resolve_repo_id(repo_id)
-    if full_id is None:
+def get_repo_or_404(repo_id: str):
+    """Get a repository by ID or prefix, raising 404 if not found."""
+    repo = registry.get(repo_id)
+    if repo is None:
         raise HTTPException(status_code=404, detail="Repository not found")
-    return repositories[full_id]
+    return repo
 
 
 async def index_repository_task(
     url: str,
     repo_id: str,
-    branch: Optional[str],
-    include_patterns: Optional[list[str]],
-    exclude_patterns: Optional[list[str]],
+    branch: str | None,
+    include_patterns: list[str] | None,
+    exclude_patterns: list[str] | None,
 ) -> None:
-    """Background task to index a repository."""
-    import torch
-
-    repo = repositories[repo_id]
-    embedder = None
-
+    """Background task to index a repository through the shared service seam."""
     try:
-        # Validate and clone
-        validator = GitHubURLValidator()
-        repo_info = await validator.validate_repository(url)
-        branch = branch or repo_info.branch or "main"
-
-        loader = RepositoryLoader()
-        repo_path = loader.clone_repository(repo_info, branch)
-
-        repo.clone_path = repo_path
-        repo.status = RepositoryStatus.INDEXING
-        save_repositories()
-
-        # Filter files
-        file_filter = FileFilter(
-            include_patterns=include_patterns,
-            exclude_patterns=exclude_patterns,
+        indexing_service.index_repository_record(
+            repo_id,
+            url,
+            IndexingOptions(
+                branch=branch,
+                include_patterns=include_patterns,
+                exclude_patterns=exclude_patterns,
+            ),
         )
-        files = list(file_filter.filter_files(repo_path))
-
-        # Process in batches to avoid CUDA OOM
-        vectorstore = VectorStore()
-        vectorstore.delete_repo_chunks(repo.id)
-        embedder = EmbeddingGenerator()
-        chunker = CodeChunker()
-
-        batch_size = settings.ingestion.batch_size
-        total_chunks = 0
-        batch: list = []
-
-        for file_path in files:
-            try:
-                doc = Document.from_file(file_path, repo_path, repo.id)
-                for chunk in chunker.chunk_document(doc):
-                    chunk.repo_id = repo.id
-                    batch.append(chunk)
-
-                    if len(batch) >= batch_size:
-                        embedded = embedder.embed_chunks(batch, show_progress=False)
-                        vectorstore.add_chunks(embedded)
-                        total_chunks += len(batch)
-                        del embedded
-                        if torch.cuda.is_available():
-                            torch.cuda.empty_cache()
-                        batch = []
-            except Exception as e:
-                logger.warning("Failed to process file", path=str(file_path), error=str(e))
-
-        # Process final batch
-        if batch:
-            embedded = embedder.embed_chunks(batch, show_progress=False)
-            vectorstore.add_chunks(embedded)
-            total_chunks += len(batch)
-            del embedded
-
-        # Update status
-        repo.chunk_count = total_chunks
-        repo.indexed_at = datetime.now()
-        repo.status = RepositoryStatus.READY
-        save_repositories()
-
-        logger.info("Repository indexed", repo_id=repo_id, chunks=total_chunks)
-
-    except Exception as e:
-        logger.error("Indexing failed", repo_id=repo_id, error=str(e))
-        repo.status = RepositoryStatus.ERROR
-        repo.error_message = str(e)
-        save_repositories()
-    finally:
-        if embedder is not None:
-            embedder.unload()
+    except Exception as exc:
+        logger.error("Indexing failed", repo_id=repo_id, error=str(exc))
 
 
 @router.post("/repos/index", response_model=IndexRepositoryResponse, status_code=202)
@@ -181,16 +61,18 @@ async def index_repository(
     background_tasks: BackgroundTasks,
 ) -> IndexRepositoryResponse:
     """Index a GitHub repository."""
-    # Create repository record
-    repo = Repository(
-        url=request.url,
-        branch=request.branch or "main",
-        status=RepositoryStatus.PENDING,
-    )
-    repositories[repo.id] = repo
-    save_repositories()
+    try:
+        repo = indexing_service.create_repository_record(
+            request.url,
+            IndexingOptions(
+                branch=request.branch,
+                include_patterns=request.include_patterns,
+                exclude_patterns=request.exclude_patterns,
+            ),
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    # Start background indexing
     background_tasks.add_task(
         index_repository_task,
         request.url,
@@ -209,60 +91,49 @@ async def index_repository(
 
 @router.post("/query", response_model=QueryResponse)
 async def query_repository(request: QueryRequest) -> QueryResponse:
-    """Query a repository.
+    """Query a repository by full ID or prefix."""
+    result = retrieval_service.query_code(request.repo_id, request.question, request.top_k)
+    if result.error is not None or result.response is None:
+        if result.error and result.error.startswith("Repository not found"):
+            raise HTTPException(status_code=404, detail="Repository not found")
+        if result.error and result.error.startswith("Repository not ready"):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Repository not ready (status: {result.repo.status.value})" if result.repo else result.error,
+            )
+        if result.error and (
+            result.error.startswith("LLM generation is disabled") or result.error.startswith("Private profile requires")
+        ):
+            raise HTTPException(status_code=400, detail=result.error)
+        raise HTTPException(status_code=500, detail=result.error or "Query failed")
 
-    Supports both full repository IDs and partial IDs (first 8+ characters).
-    """
-    # Check repository exists (supports partial IDs)
-    repo = get_repo_or_404(request.repo_id)
-
-    if repo.status != RepositoryStatus.READY:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Repository not ready (status: {repo.status.value})",
-        )
-
-    try:
-        # Generate response (use resolved repo.id for consistency)
-        generator = ResponseGenerator()
-        query = QueryModel(
-            question=request.question,
-            repo_id=repo.id,  # Use resolved full ID
-            top_k=request.top_k,
-        )
-        response = generator.generate(query)
-
-        # Convert to API schema
-        return QueryResponse(
-            answer=response.answer,
-            citations=[
-                CitationResponse(
-                    file_path=c.file_path,
-                    start_line=c.start_line,
-                    end_line=c.end_line,
-                )
-                for c in response.citations
-            ],
-            retrieved_chunks=[
-                RetrievedChunkResponse(
-                    chunk_id=c.chunk_id,
-                    file_path=c.file_path,
-                    start_line=c.start_line,
-                    end_line=c.end_line,
-                    relevance_score=c.relevance_score,
-                    chunk_type=c.chunk_type,
-                    name=c.name,
-                    content=c.content,
-                )
-                for c in response.retrieved_chunks
-            ],
-            grounded=response.grounded,
-            query_id=response.query_id,
-        )
-
-    except Exception as e:
-        logger.error("Query failed", error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+    response = result.response
+    return QueryResponse(
+        answer=response.answer,
+        citations=[
+            CitationResponse(
+                file_path=c.file_path,
+                start_line=c.start_line,
+                end_line=c.end_line,
+            )
+            for c in response.citations
+        ],
+        retrieved_chunks=[
+            RetrievedChunkResponse(
+                chunk_id=c.chunk_id,
+                file_path=c.file_path,
+                start_line=c.start_line,
+                end_line=c.end_line,
+                relevance_score=c.relevance_score,
+                chunk_type=c.chunk_type,
+                name=c.name,
+                content=c.content,
+            )
+            for c in response.retrieved_chunks
+        ],
+        grounded=response.grounded,
+        query_id=response.query_id,
+    )
 
 
 @router.get("/repos", response_model=ListRepositoriesResponse)
@@ -279,17 +150,14 @@ async def list_repositories() -> ListRepositoriesResponse:
                 indexed_at=repo.indexed_at,
                 error_message=repo.error_message,
             )
-            for repo in repositories.values()
+            for repo in registry.list()
         ]
     )
 
 
 @router.get("/repos/{repo_id}", response_model=RepositoryInfo)
 async def get_repository(repo_id: str) -> RepositoryInfo:
-    """Get repository details.
-
-    Supports both full repository IDs and partial IDs (first 8+ characters).
-    """
+    """Get repository details by full ID or prefix."""
     repo = get_repo_or_404(repo_id)
     return RepositoryInfo(
         id=repo.id,
@@ -304,23 +172,12 @@ async def get_repository(repo_id: str) -> RepositoryInfo:
 
 @router.delete("/repos/{repo_id}")
 async def delete_repository(repo_id: str) -> dict:
-    """Delete a repository.
-
-    Supports both full repository IDs and partial IDs (first 8+ characters).
-    """
-    repo = get_repo_or_404(repo_id)
-
+    """Delete a repository by full ID or prefix."""
     try:
-        # Delete from vector store (use resolved full ID)
-        vectorstore = VectorStore()
-        vectorstore.delete_repo_chunks(repo.id)
-
-        # Delete from records (use resolved full ID)
-        del repositories[repo.id]
-        save_repositories()
-
-        return {"message": f"Repository {repo.full_name} deleted"}
-
-    except Exception as e:
-        logger.error("Delete failed", error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        result = indexing_service.delete_repository(repo_id)
+    except Exception as exc:
+        logger.error("Delete failed", error=str(exc))
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    if result is None:
+        raise HTTPException(status_code=404, detail="Repository not found")
+    return {"message": f"Repository {result.repo.full_name} deleted"}

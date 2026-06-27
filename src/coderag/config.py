@@ -1,25 +1,34 @@
 """Application configuration using pydantic-settings."""
 
 from pathlib import Path
-from typing import Optional
+from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
 from coderag import __version__
 
 
 class ModelSettings(BaseSettings):
     """LLM and embedding model configuration."""
 
-    model_config = SettingsConfigDict(env_prefix="MODEL_")
+    model_config = SettingsConfigDict(
+        env_prefix="MODEL_",
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    # Privacy/provider profile: cloud is low-friction default; local-only is opt-in.
+    profile: Literal["cloud", "hybrid", "private", "retrieval-only"] = "cloud"
 
     # LLM Provider: "local", "openai", "groq", "anthropic", "openrouter"
     # Default to "groq" (free tier available, no GPU required)
     llm_provider: str = "groq"
 
     # API settings (for remote providers)
-    llm_api_key: Optional[str] = None
-    llm_api_base: Optional[str] = None  # Custom API base URL
+    llm_api_key: str | None = None
+    llm_api_base: str | None = None  # Custom API base URL
 
     # Model name (local or remote)
     llm_name: str = "Qwen/Qwen2.5-Coder-3B-Instruct"
@@ -148,7 +157,7 @@ class Settings(BaseSettings):
         self.ingestion.repos_cache_dir.mkdir(parents=True, exist_ok=True)
 
 
-_settings: Optional[Settings] = None
+_settings: Settings | None = None
 
 
 def get_settings() -> Settings:

@@ -278,9 +278,12 @@ MODEL_LLM_API_KEY=your-api-key
 # Embeddings (runs locally on CPU by default)
 MODEL_EMBEDDING_DEVICE=auto  # auto, cuda, or cpu
 
-# Server
-SERVER_HOST=0.0.0.0
+# Server defaults to loopback for local safety.
+SERVER_HOST=127.0.0.1
 SERVER_PORT=8000
+
+# Bind to 0.0.0.0 only as an explicit deployment override
+# after configuring trusted CORS origins and network access controls.
 ```
 
 ### Config File

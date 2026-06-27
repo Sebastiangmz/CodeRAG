@@ -1,0 +1,65 @@
+{
+  "currentSlice": null,
+  "history": [
+    {
+      "sliceId": "CRAG-20260627-ROADMAP",
+      "workspaceId": "CodeRAG",
+      "sessionId": "omp-session",
+      "beganAt": "2026-06-27T19:59:14.649Z",
+      "endedAt": "2026-06-27T20:08:58.201Z",
+      "outcome": "PASS",
+      "costSummary": {
+        "externalMemoryCalls": 0,
+        "externalMemoryCost": 0,
+        "subagentTokens": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "cost": 0,
+          "turns": 0
+        }
+      }
+    },
+    {
+      "sliceId": "CRAG-20260627-M0-BASELINE",
+      "workspaceId": "CodeRAG",
+      "sessionId": "omp-session",
+      "beganAt": "2026-06-27T20:18:54.230Z",
+      "endedAt": "2026-06-27T20:24:37.068Z",
+      "outcome": "PASS",
+      "costSummary": {
+        "externalMemoryCalls": 0,
+        "externalMemoryCost": 0,
+        "subagentTokens": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "cost": 0,
+          "turns": 0
+        }
+      }
+    },
+    {
+      "sliceId": "CRAG-20260627-M0-REVIEW-FIXES",
+      "workspaceId": "CodeRAG",
+      "sessionId": "omp-session",
+      "beganAt": "2026-06-27T20:34:36.861Z",
+      "endedAt": "2026-06-27T20:39:34.398Z",
+      "outcome": "PASS",
+      "costSummary": {
+        "externalMemoryCalls": 0,
+        "externalMemoryCost": 0,
+        "subagentTokens": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "cost": 0,
+          "turns": 0
+        }
+      }
+    }
+  ]
+}

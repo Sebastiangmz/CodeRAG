@@ -19,7 +19,8 @@ services:
               capabilities: [gpu]
 
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
+      # The container still binds internally; host exposure stays loopback by default.
 
     environment:
       - DEBUG=false

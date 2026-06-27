@@ -1,6 +1,5 @@
 """MCP tool definitions for CodeRAG."""
 
-from typing import Optional
 
 from coderag.mcp.handlers import get_mcp_handlers
 from coderag.mcp.server import mcp
@@ -10,8 +9,8 @@ from coderag.mcp.server import mcp
 async def index_repository(
     url: str,
     branch: str = "",
-    include_patterns: Optional[list[str]] = None,
-    exclude_patterns: Optional[list[str]] = None,
+    include_patterns: list[str] | None = None,
+    exclude_patterns: list[str] | None = None,
 ) -> dict:
     """Index a GitHub repository for code Q&A.
 
@@ -115,8 +114,8 @@ async def search_code(
     repo_id: str,
     query: str,
     top_k: int = 10,
-    file_filter: Optional[str] = None,
-    chunk_type: Optional[str] = None,
+    file_filter: str | None = None,
+    chunk_type: str | None = None,
 ) -> dict:
     """Semantic code search without LLM generation.
 

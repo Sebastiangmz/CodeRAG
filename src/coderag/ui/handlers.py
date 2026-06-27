@@ -1,6 +1,5 @@
 """UI event handlers for Gradio interface."""
 
-import json
 from datetime import datetime
 from pathlib import Path
 from typing import Iterator, Optional
@@ -20,6 +19,8 @@ from coderag.models.chunk import Chunk
 from coderag.models.document import Document
 from coderag.models.query import Query
 from coderag.models.repository import Repository, RepositoryStatus
+from coderag.services.providers import ProviderConfigService
+from coderag.ui.repository_metadata import load_repositories, save_repositories
 
 logger = get_logger(__name__)
 
@@ -36,24 +37,21 @@ class UIHandlers:
         self.embedder = EmbeddingGenerator()
         self.vectorstore = VectorStore()
         self.generator: Optional[ResponseGenerator] = None
+        self.provider_config = ProviderConfigService(self.settings.models)
 
         # Repository metadata storage
         self.repos_file = self.settings.data_dir / "repositories.json"
         self.repositories: dict[str, Repository] = self._load_repositories()
 
     def _load_repositories(self) -> dict[str, Repository]:
-        if self.repos_file.exists():
-            try:
-                data = json.loads(self.repos_file.read_text())
-                return {r["id"]: Repository.from_dict(r) for r in data}
-            except Exception as e:
-                logger.error("Failed to load repositories", error=str(e))
-        return {}
+        try:
+            return load_repositories(self.repos_file)
+        except Exception as e:
+            logger.error("Failed to load repositories", error=str(e))
+            raise
 
     def _save_repositories(self) -> None:
-        self.repos_file.parent.mkdir(parents=True, exist_ok=True)
-        data = [r.to_dict() for r in self.repositories.values()]
-        self.repos_file.write_text(json.dumps(data, indent=2))
+        save_repositories(self.repos_file, self.repositories)
 
     # =========================================================================
     # Streaming Methods (Nivel 1)
@@ -410,6 +408,10 @@ class UIHandlers:
 
         if not question.strip():
             return "", "", "Please enter a question"
+
+        block_reason = self.provider_config.generation_block_reason()
+        if block_reason is not None:
+            return "", "", f"Error: {block_reason}"
 
         try:
             # Lazy load generator

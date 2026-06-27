@@ -10,14 +10,7 @@ class TestToolRegistration:
 
     def test_tools_are_registered(self):
         """Test that all tools are registered with the MCP server."""
-        with patch("coderag.config.get_settings") as mock_get_settings, \
-             patch("coderag.mcp.handlers.GitHubURLValidator"), \
-             patch("coderag.mcp.handlers.RepositoryLoader"), \
-             patch("coderag.mcp.handlers.FileFilter"), \
-             patch("coderag.mcp.handlers.CodeChunker"), \
-             patch("coderag.mcp.handlers.EmbeddingGenerator"), \
-             patch("coderag.mcp.handlers.VectorStore"):
-
+        with patch("coderag.config.get_settings") as mock_get_settings:
             mock_settings = MagicMock()
             mock_settings.data_dir = MagicMock()
             mock_file = MagicMock()

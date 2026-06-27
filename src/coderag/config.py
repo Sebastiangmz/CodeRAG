@@ -5,6 +5,7 @@ from typing import Optional
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from coderag import __version__
 
 
 class ModelSettings(BaseSettings):
@@ -29,6 +30,7 @@ class ModelSettings(BaseSettings):
     # Local model settings
     llm_use_4bit: bool = True
     llm_device_map: str = "auto"
+    allow_remote_code: bool = False
 
     embedding_name: str = "nomic-ai/nomic-embed-text-v1.5"
     embedding_dimension: int = 768
@@ -108,11 +110,15 @@ class ServerSettings(BaseSettings):
 
     model_config = SettingsConfigDict(env_prefix="SERVER_")
 
-    host: str = "0.0.0.0"
+    host: str = "127.0.0.1"
     port: int = 8000
     reload: bool = False
     workers: int = 1
     log_level: str = "info"
+    cors_allowed_origins: list[str] = Field(
+        default_factory=lambda: ["http://127.0.0.1:8000", "http://localhost:8000"]
+    )
+    cors_allow_credentials: bool = True
 
 
 class Settings(BaseSettings):
@@ -125,7 +131,7 @@ class Settings(BaseSettings):
     )
 
     app_name: str = "CodeRAG"
-    app_version: str = "0.1.0"
+    app_version: str = __version__
     debug: bool = False
     data_dir: Path = Path("./data")
 

@@ -3,16 +3,20 @@
 
 app:
   name: CodeRAG
-  version: 0.1.0
+  version: 0.1.2
   debug: false
 
 server:
-  host: 0.0.0.0
+  host: 127.0.0.1
   port: 8000
   reload: false
   workers: 1
   log_level: info
 
+  cors_allowed_origins:
+    - http://127.0.0.1:8000
+    - http://localhost:8000
+  cors_allow_credentials: true
 data:
   base_dir: ./data
   repos_cache: ./data/repos

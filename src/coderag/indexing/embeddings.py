@@ -76,7 +76,7 @@ class EmbeddingGenerator:
             self._model = SentenceTransformer(
                 self.model_name,
                 device=self.device,
-                trust_remote_code=True,
+                trust_remote_code=settings.models.allow_remote_code,
             )
             logger.info("Embedding model loaded", device=self.device)
         except (torch.cuda.OutOfMemoryError, RuntimeError) as e:
@@ -87,7 +87,7 @@ class EmbeddingGenerator:
                 self._model = SentenceTransformer(
                     self.model_name,
                     device="cpu",
-                    trust_remote_code=True,
+                    trust_remote_code=settings.models.allow_remote_code,
                 )
                 logger.info("Embedding model loaded on CPU (fallback)")
             else:

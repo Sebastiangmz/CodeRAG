@@ -18,7 +18,7 @@ llm:
 
   # Device settings
   device_map: auto
-  trust_remote_code: true
+  trust_remote_code: false
 
   # Fallback model for constrained environments
   fallback:

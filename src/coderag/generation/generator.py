@@ -118,14 +118,14 @@ class ResponseGenerator:
 
         self._local_tokenizer = AutoTokenizer.from_pretrained(
             self.settings.models.llm_name,
-            trust_remote_code=True,
+            trust_remote_code=self.settings.models.allow_remote_code,
         )
 
         self._local_model = AutoModelForCausalLM.from_pretrained(
             self.settings.models.llm_name,
             quantization_config=bnb_config,
             device_map=self.settings.models.llm_device_map,
-            trust_remote_code=True,
+            trust_remote_code=self.settings.models.allow_remote_code,
             torch_dtype=torch.float16,
         )
 

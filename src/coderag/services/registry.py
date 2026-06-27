@@ -50,12 +50,7 @@ class RepositoryRegistry:
         return list(self.load().values())
 
     def resolve_id(self, partial_id: str) -> str | None:
-        """Resolve a full or prefix repository id.
-
-        Existing API/MCP behavior uses the first prefix match. Preserve that
-        alpha behavior until the SQLite registry milestone can make ambiguity
-        explicit.
-        """
+        """Resolve a full or prefix repository id using first-match compatibility."""
         repositories = self.load()
         if partial_id in repositories:
             return partial_id
@@ -65,10 +60,29 @@ class RepositoryRegistry:
                 return repo_id
         return None
 
+    def resolve_unique_id(self, partial_id: str) -> str | None:
+        """Resolve a full or unambiguous prefix repository id."""
+        repositories = self.load()
+        if partial_id in repositories:
+            return partial_id
+
+        matches = [repo_id for repo_id in repositories if repo_id.startswith(partial_id)]
+        if len(matches) == 1:
+            return matches[0]
+        return None
+
     def get(self, repo_id: str) -> Repository | None:
-        """Get a repository by full id or prefix."""
+        """Get a repository by full id or first prefix match."""
         repositories = self.load()
         resolved_id = repo_id if repo_id in repositories else self.resolve_id(repo_id)
+        if resolved_id is None:
+            return None
+        return repositories.get(resolved_id)
+
+    def get_unique(self, repo_id: str) -> Repository | None:
+        """Get a repository by full id or unambiguous prefix."""
+        repositories = self.load()
+        resolved_id = repo_id if repo_id in repositories else self.resolve_unique_id(repo_id)
         if resolved_id is None:
             return None
         return repositories.get(resolved_id)

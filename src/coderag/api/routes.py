@@ -26,8 +26,8 @@ retrieval_service = RetrievalService(registry=registry)
 
 
 def get_repo_or_404(repo_id: str):
-    """Get a repository by ID or prefix, raising 404 if not found."""
-    repo = registry.get(repo_id)
+    """Get a repository by full ID or unambiguous prefix, raising 404 if not found."""
+    repo = registry.get_unique(repo_id)
     if repo is None:
         raise HTTPException(status_code=404, detail="Repository not found")
     return repo
@@ -92,7 +92,8 @@ async def index_repository(
 @router.post("/query", response_model=QueryResponse)
 async def query_repository(request: QueryRequest) -> QueryResponse:
     """Query a repository by full ID or prefix."""
-    result = retrieval_service.query_code(request.repo_id, request.question, request.top_k)
+    repo = get_repo_or_404(request.repo_id)
+    result = retrieval_service.query_code(repo.id, request.question, request.top_k)
     if result.error is not None or result.response is None:
         if result.error and result.error.startswith("Repository not found"):
             raise HTTPException(status_code=404, detail="Repository not found")
@@ -173,8 +174,9 @@ async def get_repository(repo_id: str) -> RepositoryInfo:
 @router.delete("/repos/{repo_id}")
 async def delete_repository(repo_id: str) -> dict:
     """Delete a repository by full ID or prefix."""
+    repo = get_repo_or_404(repo_id)
     try:
-        result = indexing_service.delete_repository(repo_id)
+        result = indexing_service.delete_repository(repo.id)
     except Exception as exc:
         logger.error("Delete failed", error=str(exc))
         raise HTTPException(status_code=500, detail=str(exc)) from exc

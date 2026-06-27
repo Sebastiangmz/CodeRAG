@@ -39,7 +39,7 @@ class FakeIndexingService:
 
     def delete_repository(self, repo_id):
         self.deleted_repo_id = repo_id
-        if repo_id == self.repo.id[:8]:
+        if repo_id == self.repo.id:
             return RepositoryDeleteResult(repo=self.repo, chunks_deleted=4)
         return None
 
@@ -53,9 +53,31 @@ class FakeRegistry:
             return self.repo
         return None
 
+    def get_unique(self, repo_id: str):
+        if self.repo.id.startswith(repo_id):
+            return self.repo
+        return None
+
     def list(self):
         return [self.repo]
 
+
+
+class AmbiguousRegistry:
+    def __init__(self) -> None:
+        self.repos = [
+            Repository(id="abcdef111111", url="https://github.com/acme/one", status=RepositoryStatus.READY),
+            Repository(id="abcdef222222", url="https://github.com/acme/two", status=RepositoryStatus.READY),
+        ]
+
+    def get_unique(self, repo_id: str):
+        matches = [repo for repo in self.repos if repo.id.startswith(repo_id)]
+        if len(matches) == 1:
+            return matches[0]
+        return None
+
+    def list(self):
+        return self.repos
 
 @dataclass
 class FakeGeneratedResponse:
@@ -106,6 +128,7 @@ async def test_index_repository_route_creates_record_through_indexing_service(mo
 async def test_query_route_uses_retrieval_service_and_preserves_response(monkeypatch):
     repo = Repository(id="repo-ready", url="https://github.com/acme/demo", status=RepositoryStatus.READY)
     retrieval = FakeRetrievalService(repo)
+    monkeypatch.setattr(routes, "registry", FakeRegistry(repo))
     monkeypatch.setattr(routes, "retrieval_service", retrieval)
 
     response = await routes.query_repository(QueryRequest(repo_id="repo-ready", question="How?", top_k=3))
@@ -119,6 +142,7 @@ async def test_query_route_uses_retrieval_service_and_preserves_response(monkeyp
 async def test_query_route_maps_missing_and_not_ready_errors(monkeypatch):
     repo = Repository(id="repo-pending", url="https://github.com/acme/demo", status=RepositoryStatus.INDEXING)
     retrieval = FakeRetrievalService(repo)
+    monkeypatch.setattr(routes, "registry", FakeRegistry(repo))
     monkeypatch.setattr(routes, "retrieval_service", retrieval)
 
     with pytest.raises(routes.HTTPException) as missing:
@@ -134,6 +158,7 @@ async def test_query_route_maps_missing_and_not_ready_errors(monkeypatch):
 @pytest.mark.asyncio
 async def test_delete_route_maps_missing_repository(monkeypatch):
     indexing = FakeIndexingService()
+    monkeypatch.setattr(routes, "registry", FakeRegistry(indexing.repo))
     monkeypatch.setattr(routes, "indexing_service", indexing)
 
     with pytest.raises(routes.HTTPException) as exc_info:
@@ -156,8 +181,21 @@ async def test_route_repository_list_get_and_delete_share_registry_and_indexing_
     assert listed.repositories[0].id == "repo-123456"
     assert fetched.id == "repo-123456"
     assert deleted == {"message": "Repository acme/demo deleted"}
-    assert indexing.deleted_repo_id == "repo-123"
+    assert indexing.deleted_repo_id == "repo-123456"
 
+
+
+@pytest.mark.asyncio
+async def test_delete_route_rejects_ambiguous_partial_id_without_deleting(monkeypatch):
+    indexing = FakeIndexingService()
+    monkeypatch.setattr(routes, "registry", AmbiguousRegistry())
+    monkeypatch.setattr(routes, "indexing_service", indexing)
+
+    with pytest.raises(routes.HTTPException) as exc_info:
+        await routes.delete_repository("abcdef")
+
+    assert exc_info.value.status_code == 404
+    assert indexing.deleted_repo_id is None
 
 @pytest.mark.asyncio
 async def test_api_and_mcp_handlers_share_registry_backed_metadata_file(tmp_path, monkeypatch):

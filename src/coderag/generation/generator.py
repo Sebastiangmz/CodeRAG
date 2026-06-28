@@ -1,13 +1,13 @@
 """Response generation using local or remote LLMs."""
 
-from typing import Optional
+from typing import Any
 
 from coderag.config import get_settings
-from coderag.generation.citations import CitationParser
-from coderag.generation.prompts import SYSTEM_PROMPT, build_prompt, build_no_context_response
+from coderag.generation.citations import CitationParser, CitationVerifier
+from coderag.generation.prompts import SYSTEM_PROMPT, build_no_context_response, build_prompt
 from coderag.logging import get_logger
-from coderag.models.response import Response
 from coderag.models.query import Query
+from coderag.models.response import Response
 from coderag.retrieval.retriever import Retriever
 
 logger = get_logger(__name__)
@@ -18,21 +18,21 @@ class ResponseGenerator:
 
     def __init__(
         self,
-        retriever: Optional[Retriever] = None,
+        retriever: Retriever | None = None,
     ) -> None:
         self.settings = get_settings()
         self.retriever = retriever or Retriever()
         self.citation_parser = CitationParser()
+        self.citation_verifier = CitationVerifier()
 
         self.provider = self.settings.models.llm_provider.lower()
-        self._client = None
-        self._local_model = None
-        self._local_tokenizer = None
+        self._client: Any | None = None
+        self._local_model: Any | None = None
+        self._local_tokenizer: Any | None = None
 
         logger.info("ResponseGenerator initialized", provider=self.provider)
 
-    def _get_api_client(self):
-        """Get or create API client for remote providers."""
+    def _get_api_client(self) -> Any:
         if self._client is not None:
             return self._client
 
@@ -88,7 +88,7 @@ class ResponseGenerator:
         logger.info("API client created", provider=self.provider, model=self.model_name)
         return self._client
 
-    def _load_local_model(self):
+    def _load_local_model(self) -> None:
         """Load local model with transformers."""
         if self._local_model is not None:
             return
@@ -158,18 +158,17 @@ class ResponseGenerator:
         else:
             answer = self._generate_api(prompt)
 
-        # Parse citations from answer
+        # Parse and verify citations from answer
         citations = self.citation_parser.parse_citations(answer)
-
-        # Determine if response is grounded
-        grounded = len(citations) > 0 and len(chunks) > 0
+        verification_result = self.citation_verifier.verify(citations, chunks)
 
         return Response(
             answer=answer,
             citations=citations,
             retrieved_chunks=chunks,
-            grounded=grounded,
+            grounded=verification_result.grounded,
             query_id=query.id,
+            citation_verifications=verification_result.verifications,
         )
 
     def _generate_api(self, prompt: str) -> str:
@@ -189,7 +188,7 @@ class ResponseGenerator:
             top_p=self.settings.models.llm_top_p,
         )
 
-        return response.choices[0].message.content.strip()
+        return str(response.choices[0].message.content).strip()
 
     def _generate_local(self, prompt: str) -> str:
         """Generate using local model."""
@@ -197,6 +196,8 @@ class ResponseGenerator:
 
         self._load_local_model()
 
+        assert self._local_tokenizer is not None
+        assert self._local_model is not None
         messages = [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": prompt},
@@ -223,7 +224,7 @@ class ResponseGenerator:
         generated = outputs[0][inputs["input_ids"].shape[1]:]
         response = self._local_tokenizer.decode(generated, skip_special_tokens=True)
 
-        return response.strip()
+        return str(response).strip()
 
     def unload(self) -> None:
         """Unload models from memory."""

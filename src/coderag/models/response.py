@@ -1,4 +1,5 @@
 """Response entity models for Q&A results."""
+from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -18,7 +19,7 @@ class Citation:
         return f"[{self.file_path}:{self.start_line}-{self.end_line}]"
 
     @classmethod
-    def parse(cls, citation_str: str) -> "Citation" | None:
+    def parse(cls, citation_str: str) -> Citation | None:
         """Parse citation from string format [file:start-end]."""
         try:
             citation_str = citation_str.strip("[]")
@@ -77,7 +78,7 @@ class CitationVerification:
         verified: bool,
         reason: str,
         chunk_id: str | None = None,
-    ) -> "CitationVerification":
+    ) -> CitationVerification:
         return cls(
             file_path=citation.file_path,
             start_line=citation.start_line,

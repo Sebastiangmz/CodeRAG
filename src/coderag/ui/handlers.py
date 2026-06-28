@@ -1,8 +1,11 @@
 """UI event handlers for Gradio interface."""
 
+from __future__ import annotations
+
+from collections.abc import Callable, Iterator
 from datetime import datetime
 from pathlib import Path
-from typing import Iterator, Optional
+from typing import cast
 
 import torch
 
@@ -20,7 +23,7 @@ from coderag.models.document import Document
 from coderag.models.query import Query
 from coderag.models.repository import Repository, RepositoryStatus
 from coderag.services.providers import ProviderConfigService
-from coderag.ui.repository_metadata import load_repositories, save_repositories
+from coderag.services.registry import RepositoryRegistry
 
 logger = get_logger(__name__)
 
@@ -36,22 +39,22 @@ class UIHandlers:
         self.chunker = CodeChunker()
         self.embedder = EmbeddingGenerator()
         self.vectorstore = VectorStore()
-        self.generator: Optional[ResponseGenerator] = None
+        self.generator: ResponseGenerator | None = None
         self.provider_config = ProviderConfigService(self.settings.models)
 
         # Repository metadata storage
-        self.repos_file = self.settings.data_dir / "repositories.json"
+        self.registry = RepositoryRegistry()
         self.repositories: dict[str, Repository] = self._load_repositories()
 
     def _load_repositories(self) -> dict[str, Repository]:
         try:
-            return load_repositories(self.repos_file)
+            return self.registry.load()
         except Exception as e:
             logger.error("Failed to load repositories", error=str(e))
             raise
 
     def _save_repositories(self) -> None:
-        save_repositories(self.repos_file, self.repositories)
+        self.registry.save(self.repositories)
 
     # =========================================================================
     # Streaming Methods (Nivel 1)
@@ -78,6 +81,8 @@ class UIHandlers:
         try:
             embedded = self.embedder.embed_chunks(chunks, show_progress=False)
             self.vectorstore.add_chunks(embedded)
+            for chunk in embedded:
+                self.registry.record_chunk_metadata(chunk)
         finally:
             # Always release memory, even on partial failure
             if torch.cuda.is_available():
@@ -90,7 +95,7 @@ class UIHandlers:
         documents: Iterator[Document],
         repo_id: str,
         batch_size: int = 100,
-        progress_callback: Optional[callable] = None,
+        progress_callback: Callable[[int, int], None] | None = None,
     ) -> int:
         """Index using streaming with batches."""
         total_chunks = 0
@@ -122,9 +127,9 @@ class UIHandlers:
     # Validation Methods (Nivel 2)
     # =========================================================================
 
-    def _estimate_repo_size(self, files: list[Path]) -> dict:
+    def _estimate_repo_size(self, files: list[Path]) -> dict[str, int | float | bool]:
         """Estimate repository size before indexing."""
-        total_size_kb = 0
+        total_size_kb = 0.0
         estimated_chunks = 0
         chunk_size = self.settings.ingestion.chunk_size
 
@@ -146,7 +151,7 @@ class UIHandlers:
             "warn_large_repo": len(files) > self.settings.ingestion.warn_files_threshold,
         }
 
-    def _validate_repo_size(self, estimate: dict) -> tuple[bool, str]:
+    def _validate_repo_size(self, estimate: dict[str, int | float | bool]) -> tuple[bool, str]:
         """Validate if the repository can be indexed."""
         if estimate["exceeds_file_limit"]:
             return False, f"Repository exceeds file limit ({estimate['file_count']} > {self.settings.ingestion.max_files_per_repo})"
@@ -167,7 +172,7 @@ class UIHandlers:
         """Get the SHA of the current commit."""
         from git import Repo
         git_repo = Repo(repo_path)
-        return git_repo.head.commit.hexsha
+        return cast(str, git_repo.head.commit.hexsha)
 
     def _get_changed_files(
         self,
@@ -211,12 +216,19 @@ class UIHandlers:
             return "Repository not found"
 
         repo = found_repo
+        job = self.registry.begin_job(repo.id, "update")
+
 
         if not repo.last_commit:
-            return "No previous indexing found. Please re-index the full repository."
+            message = "No previous indexing found. Please re-index the full repository."
+            self.registry.finish_job(job.id, "failed", error=message)
+            return message
 
         if not repo.clone_path or not Path(repo.clone_path).exists():
-            return "Repository cache not found. Please re-index."
+            message = "Repository cache not found. Please re-index."
+            self.registry.finish_job(job.id, "failed", error=message)
+            return message
+
 
         try:
             repo_path = Path(repo.clone_path)
@@ -228,6 +240,7 @@ class UIHandlers:
             current_commit = self._get_current_commit(repo_path)
 
             if current_commit == repo.last_commit:
+                self.registry.finish_job(job.id, "succeeded", files_processed=0, chunks_indexed=0)
                 return "Repository is already up to date."
 
             added, modified, deleted = self._get_changed_files(
@@ -244,6 +257,7 @@ class UIHandlers:
             # Delete chunks for deleted/modified files
             for file_path in deleted | modified:
                 self.vectorstore.delete_file_chunks(repo.id, file_path)
+                self.registry.remove_file_metadata(repo.id, file_path)
 
             # Index new/modified files
             files_to_index = []
@@ -252,6 +266,9 @@ class UIHandlers:
                 full_path = repo_path / file_path
                 if full_path.exists() and file_filter.should_include(full_path, repo_path):
                     files_to_index.append(full_path)
+            for indexed_path in files_to_index:
+                relative_path = str(indexed_path.relative_to(repo_path))
+                self.registry.record_file_metadata(repo.id, relative_path, size_bytes=indexed_path.stat().st_size)
 
             new_chunks = 0
             if files_to_index:
@@ -263,6 +280,12 @@ class UIHandlers:
             repo.last_commit = current_commit
             repo.indexed_at = datetime.now()
             repo.chunk_count = self.vectorstore.get_repo_chunk_count(repo.id)
+            self.registry.finish_job(
+                job.id,
+                "succeeded",
+                files_processed=len(added | modified | deleted),
+                chunks_indexed=new_chunks,
+            )
             self._save_repositories()
 
             return (
@@ -274,6 +297,7 @@ class UIHandlers:
             )
 
         except Exception as e:
+            self.registry.finish_job(job.id, "failed", error=str(e))
             logger.error("Incremental indexing failed", error=str(e), exc_info=True)
             return f"Error: {str(e)}"
 
@@ -299,6 +323,8 @@ class UIHandlers:
                 status=RepositoryStatus.CLONING,
             )
             self.repositories[repo.id] = repo
+            self.registry.add(repo)
+            job = self.registry.begin_job(repo.id, "index")
 
             # Clone repository
             yield f"Cloning {repo_info.full_name} (branch: {branch})..."
@@ -306,7 +332,7 @@ class UIHandlers:
             repo_path = self.loader.clone_repository(repo_info, branch)
             repo.clone_path = repo_path
             repo.status = RepositoryStatus.INDEXING
-
+            self.registry.update(repo)
             # Setup filter with custom patterns
             include = [p.strip() for p in include_patterns.split(",") if p.strip()] or None
             exclude = [p.strip() for p in exclude_patterns.split(",") if p.strip()] or None
@@ -326,7 +352,8 @@ class UIHandlers:
             if not can_proceed:
                 repo.status = RepositoryStatus.ERROR
                 repo.error_message = message
-                self._save_repositories()
+                self.registry.update(repo)
+                self.registry.finish_job(job.id, "failed", error=message)
                 yield f"Error: {message}"
                 return
 
@@ -339,6 +366,11 @@ class UIHandlers:
             # Delete existing chunks for this repo (re-indexing)
             logger.info("Deleting previous chunks for repo", repo_id=repo.id)
             self.vectorstore.delete_repo_chunks(repo.id)
+            self.registry.clear_file_metadata(repo.id)
+            self.registry.clear_chunk_metadata(repo.id)
+            for file_path in files:
+                relative_path = str(file_path.relative_to(repo_path))
+                self.registry.record_file_metadata(repo.id, relative_path, size_bytes=file_path.stat().st_size)
 
             # Stream indexing with batches and progress updates
             yield f"Indexing... (0/{file_count} files, 0 chunks)"
@@ -349,10 +381,8 @@ class UIHandlers:
             # Process with progress updates
             total_chunks = 0
             batch: list[Chunk] = []
-            doc_count = 0
 
-            for doc in doc_generator:
-                doc_count += 1
+            for doc_count, doc in enumerate(doc_generator, start=1):
                 for chunk in self.chunker.chunk_document(doc):
                     chunk.repo_id = repo.id
                     batch.append(chunk)
@@ -379,7 +409,9 @@ class UIHandlers:
             repo.chunk_count = total_chunks
             repo.indexed_at = datetime.now()
             repo.status = RepositoryStatus.READY
-            self._save_repositories()
+            self.registry.update(repo)
+            self.registry.finish_job(job.id, "succeeded", files_processed=file_count, chunks_indexed=total_chunks)
+            self.repositories = self._load_repositories()
 
             result = f"Successfully indexed {repo_info.full_name}\n{file_count} files processed\n{total_chunks} chunks indexed"
             logger.info("Indexing complete", result=result)
@@ -393,7 +425,9 @@ class UIHandlers:
             if "repo" in locals():
                 repo.status = RepositoryStatus.ERROR
                 repo.error_message = str(e)
-                self._save_repositories()
+                self.registry.update(repo)
+            if "job" in locals():
+                self.registry.finish_job(job.id, "failed", error=str(e))
             yield f"Error: {str(e)}"
 
     def ask_question(
@@ -444,9 +478,10 @@ class UIHandlers:
             logger.error("Question failed", error=str(e))
             return "", "", f"Error: {str(e)}"
 
-    def get_repositories(self):
+    def get_repositories(self) -> object:
         """Get list of repositories for dropdown."""
         import gradio as gr
+        self.repositories = self._load_repositories()
         choices = []
         for repo in self.repositories.values():
             if repo.status == RepositoryStatus.READY:
@@ -454,9 +489,10 @@ class UIHandlers:
                 choices.append((label, repo.id))
         return gr.update(choices=choices)
 
-    def get_repositories_table(self) -> list[list]:
+    def get_repositories_table(self) -> list[list[object]]:
         """Get repositories as table data."""
         rows = []
+        self.repositories = self._load_repositories()
         for repo in self.repositories.values():
             rows.append([
                 repo.id[:8],
@@ -468,21 +504,17 @@ class UIHandlers:
             ])
         return rows
 
-    def delete_repository(self, repo_id: str) -> tuple[str, list[list]]:
+    def delete_repository(self, repo_id: str) -> tuple[str, list[list[object]]]:
         """Delete a repository."""
         repo_id = repo_id.strip()
 
-        # Find by full or partial ID
-        found_repo = None
-        for rid, repo in self.repositories.items():
-            if rid == repo_id or rid.startswith(repo_id):
-                found_repo = repo
-                break
+        found_repo = self.registry.get(repo_id)
 
         if not found_repo:
             return "Repository not found", self.get_repositories_table()
 
         try:
+            job = self.registry.begin_job(found_repo.id, "delete")
             # Delete from vector store
             self.vectorstore.delete_repo_chunks(found_repo.id)
 
@@ -492,11 +524,14 @@ class UIHandlers:
             )
 
             # Remove from records
-            del self.repositories[found_repo.id]
-            self._save_repositories()
+            self.registry.remove(found_repo.id)
+            self.registry.finish_job(job.id, "succeeded")
+            self.repositories = self._load_repositories()
 
             return f"Deleted {found_repo.full_name}", self.get_repositories_table()
 
         except Exception as e:
+            if "job" in locals():
+                self.registry.finish_job(job.id, "failed", error=str(e))
             logger.error("Delete failed", error=str(e))
             return f"Error: {str(e)}", self.get_repositories_table()

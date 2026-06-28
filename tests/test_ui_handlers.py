@@ -1,4 +1,5 @@
 """UI privacy/profile guard tests."""
+# mypy: disable-error-code="no-untyped-def,no-untyped-call"
 
 import ast
 import importlib.util
@@ -47,6 +48,49 @@ def test_ui_ask_question_checks_provider_profile_before_generation_setup():
     assert "generate" in call_names
     assert call_names.index("generation_block_reason") < call_names.index("ResponseGenerator")
     assert call_names.index("generation_block_reason") < call_names.index("generate")
+
+
+def test_ui_repository_state_uses_shared_registry_not_json_helpers():
+    module = ast.parse(HANDLERS_PATH.read_text())
+    imported_names = {
+        alias.name
+        for node in module.body
+        if isinstance(node, ast.ImportFrom)
+        for alias in node.names
+    }
+    init_method = _function(module, "__init__")
+
+    init_call_names = [name for node in ast.walk(init_method) if (name := _call_name(node)) is not None]
+
+    assert "RepositoryRegistry" in imported_names
+    assert "load_repositories" not in imported_names
+    assert "save_repositories" not in imported_names
+    assert "RepositoryRegistry" in init_call_names
+
+
+def test_ui_repository_operations_record_durable_jobs():
+    module = ast.parse(HANDLERS_PATH.read_text())
+    index_method = _function(module, "index_repository")
+    update_method = _function(module, "index_repository_incremental")
+    delete_method = _function(module, "delete_repository")
+
+    index_calls = [name for node in ast.walk(index_method) if (name := _call_name(node)) is not None]
+    update_calls = [name for node in ast.walk(update_method) if (name := _call_name(node)) is not None]
+    delete_calls = [name for node in ast.walk(delete_method) if (name := _call_name(node)) is not None]
+
+    assert "begin_job" in index_calls
+    assert "finish_job" in index_calls
+    assert "record_file_metadata" in index_calls
+    assert "begin_job" in update_calls
+    assert "finish_job" in update_calls
+    update_source = ast.get_source_segment(HANDLERS_PATH.read_text(), update_method)
+    assert update_source is not None
+    assert update_source.index("begin_job") < update_source.index("last_commit")
+    assert update_source.index("begin_job") < update_source.index("clone_path")
+    assert "remove_file_metadata" in update_calls
+    assert "record_file_metadata" in update_calls
+    assert "begin_job" in delete_calls
+    assert "finish_job" in delete_calls
 
 
 def test_ui_repository_loader_fails_closed_on_corrupt_metadata(tmp_path):

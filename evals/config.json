@@ -301,6 +301,123 @@
           }
         ]
       }
+    },
+    {
+      "schema_version": "evalfly.case.v1",
+      "case_id": "m2-sqlite-contract-exists",
+      "title": "Milestone 2 SQLite registry contract exists",
+      "suite": "smoke",
+      "risk_tier": "critical",
+      "task_type": "state_persistence",
+      "source": {
+        "kind": "repo_file",
+        "path": "docs/superpowers/plans/2026-06-27-m2-sqlite-registry-contract.md"
+      },
+      "privacy": {
+        "contains_user_data": false,
+        "contains_code": true,
+        "data_classification": "public_repo"
+      },
+      "expected": {
+        "artifact": "docs/superpowers/plans/2026-06-27-m2-sqlite-registry-contract.md"
+      },
+      "judge": {
+        "type": "deterministic",
+        "assertions": [
+          {
+            "type": "file_exists",
+            "path": "docs/superpowers/plans/2026-06-27-m2-sqlite-registry-contract.md"
+          }
+        ]
+      }
+    },
+    {
+      "schema_version": "evalfly.case.v1",
+      "case_id": "m2-registry-implementation-exists",
+      "title": "Milestone 2 SQLite registry implementation exists",
+      "suite": "smoke",
+      "risk_tier": "critical",
+      "task_type": "state_persistence",
+      "source": {
+        "kind": "repo_file",
+        "path": "src/coderag/services/registry.py"
+      },
+      "privacy": {
+        "contains_user_data": false,
+        "contains_code": true,
+        "data_classification": "public_repo"
+      },
+      "expected": {
+        "artifact": "src/coderag/services/registry.py"
+      },
+      "judge": {
+        "type": "deterministic",
+        "assertions": [
+          {
+            "type": "file_exists",
+            "path": "src/coderag/services/registry.py"
+          },
+          {
+            "type": "file_contains",
+            "path": "src/coderag/services/registry.py",
+            "text": "CREATE TABLE IF NOT EXISTS registry_metadata"
+          },
+          {
+            "type": "file_contains",
+            "path": "src/coderag/services/registry.py",
+            "text": "CREATE TABLE IF NOT EXISTS index_jobs"
+          },
+          {
+            "type": "file_contains",
+            "path": "src/coderag/services/registry.py",
+            "text": "repositories_json_migrated_at"
+          }
+        ]
+      }
+    },
+    {
+      "schema_version": "evalfly.case.v1",
+      "case_id": "m2-registry-tests-exist",
+      "title": "Milestone 2 registry and job-state tests exist",
+      "suite": "smoke",
+      "risk_tier": "critical",
+      "task_type": "state_persistence",
+      "source": {
+        "kind": "repo_file",
+        "path": "tests/test_m2_registry.py"
+      },
+      "privacy": {
+        "contains_user_data": false,
+        "contains_code": true,
+        "data_classification": "public_repo"
+      },
+      "expected": {
+        "artifact": "tests/test_m2_registry.py"
+      },
+      "judge": {
+        "type": "deterministic",
+        "assertions": [
+          {
+            "type": "file_exists",
+            "path": "tests/test_m2_registry.py"
+          },
+          {
+            "type": "file_contains",
+            "path": "tests/test_m2_registry.py",
+            "text": "test_sqlite_registry_does_not_resurrect_json_after_delete"
+          },
+          {
+            "type": "file_contains",
+            "path": "tests/test_m2_registry.py",
+            "text": "test_sqlite_registry_save_preserves_file_and_chunk_metadata"
+          },
+          {
+            "type": "file_contains",
+            "path": "tests/test_m2_registry.py",
+            "text": "test_update_repository_persists_failed_update_job"
+          }
+        ]
+      }
     }
   ]
 }

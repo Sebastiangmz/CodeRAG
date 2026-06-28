@@ -2,11 +2,11 @@
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
+from typing import Any
 from uuid import uuid4
 
 
-class ChunkType(str, Enum):
+class ChunkType(str, Enum):  # noqa: UP042
     """Type of code chunk."""
 
     FUNCTION = "function"
@@ -26,11 +26,11 @@ class ChunkMetadata:
     start_line: int
     end_line: int
     chunk_type: ChunkType
-    language: Optional[str] = None
-    name: Optional[str] = None
-    signature: Optional[str] = None
-    docstring: Optional[str] = None
-    parent_name: Optional[str] = None
+    language: str | None = None
+    name: str | None = None
+    signature: str | None = None
+    docstring: str | None = None
+    parent_name: str | None = None
 
     @property
     def line_range(self) -> str:
@@ -51,7 +51,7 @@ class Chunk:
     metadata: ChunkMetadata
     repo_id: str
     id: str = field(default_factory=lambda: str(uuid4()))
-    embedding: Optional[list[float]] = None
+    embedding: list[float] | None = None
 
     @property
     def file_path(self) -> str:
@@ -74,7 +74,7 @@ class Chunk:
         return self.metadata.chunk_type
 
     @property
-    def name(self) -> Optional[str]:
+    def name(self) -> str | None:
         """Convenience accessor for name."""
         return self.metadata.name
 
@@ -83,7 +83,7 @@ class Chunk:
         """Get citation format."""
         return self.metadata.citation
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for storage."""
         return {
             "id": self.id,
@@ -101,7 +101,7 @@ class Chunk:
         }
 
     @classmethod
-    def from_dict(cls, data: dict, embedding: Optional[list[float]] = None) -> "Chunk":
+    def from_dict(cls, data: dict[str, Any], embedding: list[float] | None = None) -> "Chunk":
         """Create from dictionary."""
         metadata = ChunkMetadata(
             file_path=data["file_path"],

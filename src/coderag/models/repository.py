@@ -4,11 +4,11 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Optional
+from typing import Any
 from uuid import uuid4
 
 
-class RepositoryStatus(str, Enum):
+class RepositoryStatus(str, Enum):  # noqa: UP042
     """Repository indexing status."""
 
     PENDING = "pending"
@@ -25,12 +25,12 @@ class Repository:
     url: str
     branch: str = "main"
     id: str = field(default_factory=lambda: str(uuid4()))
-    clone_path: Optional[Path] = None
-    indexed_at: Optional[datetime] = None
+    clone_path: Path | None = None
+    indexed_at: datetime | None = None
     chunk_count: int = 0
     status: RepositoryStatus = RepositoryStatus.PENDING
-    error_message: Optional[str] = None
-    last_commit: Optional[str] = None  # SHA of last indexed commit (for incremental updates)
+    error_message: str | None = None
+    last_commit: str | None = None  # SHA of last indexed commit (for incremental updates)
 
     @property
     def name(self) -> str:
@@ -48,7 +48,7 @@ class Repository:
         """Get owner/repo format."""
         return f"{self.owner}/{self.name}"
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "id": self.id,
@@ -63,7 +63,7 @@ class Repository:
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> "Repository":
+    def from_dict(cls, data: dict[str, Any]) -> "Repository":
         """Create from dictionary."""
         return cls(
             id=data["id"],

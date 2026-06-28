@@ -418,6 +418,94 @@
           }
         ]
       }
+    },
+    {
+      "schema_version": "evalfly.case.v1",
+      "case_id": "m3-citation-verifier-exists",
+      "title": "Milestone 3 citation verifier implementation exists",
+      "suite": "smoke",
+      "risk_tier": "critical",
+      "task_type": "grounding_verification",
+      "source": {
+        "kind": "specsafe_slice",
+        "slice_id": "CRAG-20260628-M3-VERIFIED-CITATIONS"
+      },
+      "privacy": {
+        "contains_user_data": false,
+        "contains_code": true,
+        "data_classification": "public_repo"
+      },
+      "expected": {
+        "artifact": "src/coderag/generation/citations.py"
+      },
+      "judge": {
+        "type": "deterministic",
+        "assertions": [
+          {
+            "type": "file_exists",
+            "path": "src/coderag/generation/citations.py"
+          },
+          {
+            "type": "file_contains",
+            "path": "src/coderag/generation/citations.py",
+            "text": "class CitationVerifier"
+          },
+          {
+            "type": "file_contains",
+            "path": "src/coderag/generation/citations.py",
+            "text": "path_not_retrieved"
+          },
+          {
+            "type": "file_contains",
+            "path": "src/coderag/generation/citations.py",
+            "text": "line_range_not_retrieved"
+          },
+          {
+            "type": "file_contains",
+            "path": "src/coderag/generation/citations.py",
+            "text": "invalid_line_range"
+          }
+        ]
+      }
+    },
+    {
+      "schema_version": "evalfly.case.v1",
+      "case_id": "m3-citation-tests-exist",
+      "title": "Milestone 3 citation verification tests exist",
+      "suite": "smoke",
+      "risk_tier": "critical",
+      "task_type": "test_coverage",
+      "source": {
+        "kind": "repo_file",
+        "path": "tests/test_m3_citations.py"
+      },
+      "privacy": {
+        "contains_user_data": false,
+        "contains_code": true,
+        "data_classification": "public_repo"
+      },
+      "expected": {
+        "artifact": "tests/test_m3_citations.py"
+      },
+      "judge": {
+        "type": "deterministic",
+        "assertions": [
+          {
+            "type": "file_exists",
+            "path": "tests/test_m3_citations.py"
+          },
+          {
+            "type": "file_contains",
+            "path": "tests/test_m3_citations.py",
+            "text": "test_citation_verifier_requires_all_citations_to_be_verified_for_grounding"
+          },
+          {
+            "type": "file_contains",
+            "path": "tests/test_m3_citations.py",
+            "text": "test_response_generator_grounds_only_when_all_citations_verify"
+          }
+        ]
+      }
     }
   ]
 }

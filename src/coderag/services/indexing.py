@@ -133,6 +133,7 @@ class IndexingService:
     ) -> IndexingResult:
         """Index into an existing repository record created by an adapter."""
         options = options or IndexingOptions()
+        job = self.registry.begin_job(repo.id, "index")
         try:
             logger.info("Indexing service: cloning repository", url=repo.url, branch=branch)
             repo.status = RepositoryStatus.CLONING
@@ -150,6 +151,11 @@ class IndexingService:
             files = list(file_filter.filter_files(repo_path))
 
             self._get_vectorstore().delete_repo_chunks(repo.id)
+            self.registry.clear_file_metadata(repo.id)
+            self.registry.clear_chunk_metadata(repo.id)
+            for file_path in files:
+                relative_path = str(file_path.relative_to(repo_path))
+                self.registry.record_file_metadata(repo.id, relative_path, size_bytes=file_path.stat().st_size)
             chunks_indexed = self.index_files(files, repo_path, repo.id)
             last_commit = self._resolve_commit(repo_path)
 
@@ -158,11 +164,13 @@ class IndexingService:
             repo.status = RepositoryStatus.READY
             repo.last_commit = last_commit
             self.registry.update(repo)
+            self.registry.finish_job(job.id, "succeeded", files_processed=len(files), chunks_indexed=chunks_indexed)
             return IndexingResult(repo=repo, files_processed=len(files), chunks_indexed=chunks_indexed, last_commit=last_commit)
         except Exception as exc:
             repo.status = RepositoryStatus.ERROR
             repo.error_message = str(exc)
             self.registry.update(repo)
+            self.registry.finish_job(job.id, "failed", error=str(exc))
             logger.error("Indexing service: indexing failed", repo_id=repo.id, error=str(exc))
             raise
         finally:
@@ -199,75 +207,98 @@ class IndexingService:
         if repo is None:
             return None
 
-        vectorstore = self._get_vectorstore()
-        chunks_deleted = vectorstore.get_repo_chunk_count(repo.id)
-        vectorstore.delete_repo_chunks(repo.id)
-
+        job = self.registry.begin_job(repo.id, "delete")
         try:
-            self._get_loader().delete_cache(type("RepoInfo", (), {"owner": repo.owner, "name": repo.name})())
-        except Exception:
-            logger.debug("Repository cache delete skipped", repo_id=repo.id)
+            vectorstore = self._get_vectorstore()
+            chunks_deleted = vectorstore.get_repo_chunk_count(repo.id)
+            vectorstore.delete_repo_chunks(repo.id)
 
-        removed = self.registry.remove(repo.id)
-        if removed is None:
-            return None
-        return RepositoryDeleteResult(repo=removed, chunks_deleted=chunks_deleted)
+            try:
+                self._get_loader().delete_cache(type("RepoInfo", (), {"owner": repo.owner, "name": repo.name})())
+            except Exception:
+                logger.debug("Repository cache delete skipped", repo_id=repo.id)
+
+            removed = self.registry.remove(repo.id)
+            if removed is None:
+                self.registry.finish_job(job.id, "failed", error="Repository not found")
+                return None
+            self.registry.finish_job(job.id, "succeeded", chunks_indexed=chunks_deleted)
+            return RepositoryDeleteResult(repo=removed, chunks_deleted=chunks_deleted)
+        except Exception as exc:
+            self.registry.finish_job(job.id, "failed", error=str(exc))
+            raise
 
     def update_repository(self, repo_id: str) -> IncrementalIndexingResult:
         """Incrementally update an indexed repository from its cached clone."""
         repo = self.registry.get(repo_id)
         if repo is None:
             raise ValueError(f"Repository not found: {repo_id}")
-        if not repo.last_commit:
-            raise ValueError("No previous indexing found. Please re-index the full repository.")
-        if not repo.clone_path or not Path(repo.clone_path).exists():
-            raise ValueError("Repository cache not found. Please re-index.")
+        job = self.registry.begin_job(repo.id, "update")
+        try:
+            if not repo.last_commit:
+                raise ValueError("No previous indexing found. Please re-index the full repository.")
+            if not repo.clone_path or not Path(repo.clone_path).exists():
+                raise ValueError("Repository cache not found. Please re-index.")
 
-        repo_path = Path(repo.clone_path)
-        self._get_loader()._update_repository(repo_path, repo.branch, None)
-        current_commit = self._resolve_commit(repo_path)
-        if current_commit == repo.last_commit:
-            return IncrementalIndexingResult(
-                repo=repo,
-                files_changed=0,
-                files_added=0,
-                files_modified=0,
-                files_deleted=0,
-                chunks_added=0,
-                chunks_deleted=0,
-                total_chunks=repo.chunk_count,
-                already_up_to_date=True,
+            repo_path = Path(repo.clone_path)
+            self._get_loader()._update_repository(repo_path, repo.branch, None)
+            current_commit = self._resolve_commit(repo_path)
+            if current_commit == repo.last_commit:
+                self.registry.finish_job(job.id, "succeeded", files_processed=0, chunks_indexed=0)
+                return IncrementalIndexingResult(
+                    repo=repo,
+                    files_changed=0,
+                    files_added=0,
+                    files_modified=0,
+                    files_deleted=0,
+                    chunks_added=0,
+                    chunks_deleted=0,
+                    total_chunks=repo.chunk_count,
+                    already_up_to_date=True,
+                )
+
+            added, modified, deleted = self._get_changed_files(repo_path, repo.last_commit, current_commit or repo.last_commit)
+            chunks_deleted = 0
+            for file_path in deleted | modified:
+                count = self._get_vectorstore().delete_file_chunks(repo.id, file_path)
+                chunks_deleted += count or 0
+                self.registry.remove_file_metadata(repo.id, file_path)
+
+            file_filter = self._get_file_filter_factory()()
+            files_to_index = []
+            for file_path in added | modified:
+                full_path = repo_path / file_path
+                if full_path.exists() and file_filter.should_include(full_path, repo_path):
+                    files_to_index.append(full_path)
+            for indexed_path in files_to_index:
+                relative_path = str(indexed_path.relative_to(repo_path))
+                self.registry.record_file_metadata(repo.id, relative_path, size_bytes=indexed_path.stat().st_size)
+
+            chunks_added = self.index_files(files_to_index, repo_path, repo.id) if files_to_index else 0
+            repo.last_commit = current_commit
+            repo.indexed_at = datetime.now()
+            repo.chunk_count = self._get_vectorstore().get_repo_chunk_count(repo.id)
+            self.registry.update(repo)
+            self.registry.finish_job(
+                job.id,
+                "succeeded",
+                files_processed=len(added | modified | deleted),
+                chunks_indexed=chunks_added,
             )
 
-        added, modified, deleted = self._get_changed_files(repo_path, repo.last_commit, current_commit or repo.last_commit)
-        chunks_deleted = 0
-        for file_path in deleted | modified:
-            count = self._get_vectorstore().delete_file_chunks(repo.id, file_path)
-            chunks_deleted += count or 0
-
-        file_filter = self._get_file_filter_factory()()
-        files_to_index = []
-        for file_path in added | modified:
-            full_path = repo_path / file_path
-            if full_path.exists() and file_filter.should_include(full_path, repo_path):
-                files_to_index.append(full_path)
-
-        chunks_added = self.index_files(files_to_index, repo_path, repo.id) if files_to_index else 0
-        repo.last_commit = current_commit
-        repo.indexed_at = datetime.now()
-        repo.chunk_count = self._get_vectorstore().get_repo_chunk_count(repo.id)
-        self.registry.update(repo)
-
-        return IncrementalIndexingResult(
-            repo=repo,
-            files_changed=len(added | modified | deleted),
-            files_added=len(added),
-            files_modified=len(modified),
-            files_deleted=len(deleted),
-            chunks_added=chunks_added,
-            chunks_deleted=chunks_deleted,
-            total_chunks=repo.chunk_count,
-        )
+            return IncrementalIndexingResult(
+                repo=repo,
+                files_changed=len(added | modified | deleted),
+                files_added=len(added),
+                files_modified=len(modified),
+                files_deleted=len(deleted),
+                chunks_added=chunks_added,
+                chunks_deleted=chunks_deleted,
+                total_chunks=repo.chunk_count,
+            )
+        except Exception as exc:
+            self.registry.finish_job(job.id, "failed", error=str(exc))
+            raise
 
     def get_indexed_files(self, repo_id: str) -> set[str]:
         return cast(set[str], self._get_vectorstore().get_indexed_files(repo_id))
@@ -281,6 +312,8 @@ class IndexingService:
         try:
             embedded = self._get_embedder().embed_chunks(chunks, show_progress=False)
             self._get_vectorstore().add_chunks(embedded)
+            for chunk in embedded:
+                self.registry.record_chunk_metadata(chunk)
             return len(chunks)
         finally:
             try:

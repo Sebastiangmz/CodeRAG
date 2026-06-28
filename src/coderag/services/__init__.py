@@ -7,7 +7,13 @@ from coderag.services.indexing import (
     IndexingService,
 )
 from coderag.services.providers import ProviderConfigService
-from coderag.services.registry import RepositoryRegistry, RepositoryRegistryError
+from coderag.services.registry import (
+    RegistryJob,
+    RepositoryChunkRecord,
+    RepositoryFileRecord,
+    RepositoryRegistry,
+    RepositoryRegistryError,
+)
 from coderag.services.retrieval import QueryServiceResult, RetrievalService
 
 __all__ = [
@@ -17,6 +23,9 @@ __all__ = [
     "IndexingService",
     "ProviderConfigService",
     "QueryServiceResult",
+    "RegistryJob",
+    "RepositoryChunkRecord",
+    "RepositoryFileRecord",
     "RepositoryRegistry",
     "RepositoryRegistryError",
     "RetrievalService",

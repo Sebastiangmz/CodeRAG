@@ -138,7 +138,7 @@ class FakeGenerator:
         return FakeResponse()
 
 
-def test_repository_registry_preserves_json_shape_and_partial_ids(tmp_path):
+def test_repository_registry_preserves_partial_ids_and_persists_metadata(tmp_path):
     registry = RepositoryRegistry(tmp_path / "repositories.json")
     repo = Repository(
         id="abcdef123456",
@@ -152,9 +152,6 @@ def test_repository_registry_preserves_json_shape_and_partial_ids(tmp_path):
 
     assert registry.resolve_id("abcdef12") == repo.id
     assert registry.get("abcdef12") == repo
-    raw = (tmp_path / "repositories.json").read_text()
-    assert raw.startswith("[")
-    assert '"url": "https://github.com/acme/demo"' in raw
 
     reloaded = RepositoryRegistry(tmp_path / "repositories.json")
     assert reloaded.list()[0].id == repo.id

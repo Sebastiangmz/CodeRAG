@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 
 @dataclass
@@ -10,7 +9,7 @@ class DocumentMetadata:
     """Metadata for a source document."""
 
     file_path: str
-    language: Optional[str] = None
+    language: str | None = None
     size_bytes: int = 0
     line_count: int = 0
     encoding: str = "utf-8"
@@ -35,7 +34,7 @@ class Document:
         return self.metadata.file_path
 
     @property
-    def language(self) -> Optional[str]:
+    def language(self) -> str | None:
         """Convenience accessor for language."""
         return self.metadata.language
 
@@ -58,7 +57,7 @@ class Document:
         return cls(content=content, metadata=metadata, repo_id=repo_id)
 
 
-def _detect_language(extension: str) -> Optional[str]:
+def _detect_language(extension: str) -> str | None:
     """Detect programming language from file extension."""
     extension_map = {
         ".py": "python",

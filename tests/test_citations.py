@@ -1,9 +1,7 @@
 """Tests for citation parsing."""
-
-import pytest
+# mypy: disable-error-code="no-untyped-def"
 
 from coderag.generation.citations import CitationParser
-from coderag.models.response import Citation
 
 
 def test_parse_single_citation():

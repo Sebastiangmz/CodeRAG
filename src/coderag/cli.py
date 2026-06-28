@@ -372,6 +372,16 @@ def query(repo_id: str, question: str, top_k: int, output_format: str):
             for citation in result["citations"]:
                 click.echo(f"   {citation}")
 
+        if result.get("citation_verifications"):
+            click.echo("\n🧾 Citation verification:")
+            for verification in result["citation_verifications"]:
+                status = "verified" if verification.get("verified") else "unverified"
+                path = verification.get("file_path")
+                start_line = verification.get("start_line")
+                end_line = verification.get("end_line")
+                reason = verification.get("reason")
+                click.echo(f"   - {path}:{start_line}-{end_line} [{status}: {reason}]")
+
         if result.get("evidence"):
             click.echo("\n📂 Evidence:")
             for chunk in result["evidence"][:3]:  # Show top 3

@@ -100,6 +100,26 @@
           "turns": 0
         }
       }
+    },
+    {
+      "sliceId": "CRAG-20260628-M3-VERIFIED-CITATIONS",
+      "workspaceId": "CodeRAG",
+      "sessionId": "omp-session",
+      "beganAt": "2026-06-28T03:53:31.850Z",
+      "endedAt": "2026-06-28T04:36:32.656Z",
+      "outcome": "PASS",
+      "costSummary": {
+        "externalMemoryCalls": 0,
+        "externalMemoryCost": 0,
+        "subagentTokens": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "cost": 0,
+          "turns": 0
+        }
+      }
     }
   ]
 }

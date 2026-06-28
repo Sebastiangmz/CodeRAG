@@ -11,6 +11,31 @@ from coderag.services.retrieval import RetrievalService
 logger = get_logger(__name__)
 
 
+def _read_field(item: Any, field: str, default: Any = None) -> Any:
+    if isinstance(item, dict):
+        return item.get(field, default)
+    return getattr(item, field, default)
+
+
+def _citation_dict(item: Any) -> dict[str, Any]:
+    return {
+        "file_path": _read_field(item, "file_path"),
+        "start_line": _read_field(item, "start_line"),
+        "end_line": _read_field(item, "end_line"),
+    }
+
+
+def _citation_verification_dict(item: Any) -> dict[str, Any]:
+    return {
+        "file_path": _read_field(item, "file_path"),
+        "start_line": _read_field(item, "start_line"),
+        "end_line": _read_field(item, "end_line"),
+        "verified": _read_field(item, "verified"),
+        "reason": _read_field(item, "reason"),
+        "chunk_id": _read_field(item, "chunk_id"),
+    }
+
+
 class MCPHandlers:
     """Handlers for MCP tools backed by shared application services."""
 
@@ -82,6 +107,7 @@ class MCPHandlers:
                 "answer": "",
                 "citations": [],
                 "evidence": [],
+                "citation_verifications": [],
                 "grounded": False,
                 "error": result.error or "Query failed",
             }
@@ -89,7 +115,7 @@ class MCPHandlers:
         response = result.response
         return {
             "answer": response.answer,
-            "citations": response.citations,
+            "citations": [_citation_dict(citation) for citation in response.citations],
             "evidence": [
                 {
                     "file": chunk.file_path,
@@ -101,6 +127,10 @@ class MCPHandlers:
                 for chunk in response.retrieved_chunks
             ],
             "grounded": response.grounded,
+            "citation_verifications": [
+                _citation_verification_dict(verification)
+                for verification in getattr(response, "citation_verifications", [])
+            ],
         }
 
     async def list_repositories(self) -> dict[str, Any]:

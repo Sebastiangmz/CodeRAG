@@ -1,8 +1,8 @@
 """Response entity models for Q&A results."""
+from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional
 from uuid import uuid4
 
 
@@ -19,7 +19,7 @@ class Citation:
         return f"[{self.file_path}:{self.start_line}-{self.end_line}]"
 
     @classmethod
-    def parse(cls, citation_str: str) -> Optional["Citation"]:
+    def parse(cls, citation_str: str) -> Citation | None:
         """Parse citation from string format [file:start-end]."""
         try:
             citation_str = citation_str.strip("[]")
@@ -51,12 +51,42 @@ class RetrievedChunk:
     end_line: int
     relevance_score: float
     chunk_type: str
-    name: Optional[str] = None
+    name: str | None = None
 
     @property
     def citation(self) -> str:
         """Get citation format."""
         return f"[{self.file_path}:{self.start_line}-{self.end_line}]"
+
+
+@dataclass
+class CitationVerification:
+    """Verification status for a parsed citation."""
+
+    file_path: str
+    start_line: int
+    end_line: int
+    verified: bool
+    reason: str
+    chunk_id: str | None = None
+
+    @classmethod
+    def from_citation(
+        cls,
+        citation: Citation,
+        *,
+        verified: bool,
+        reason: str,
+        chunk_id: str | None = None,
+    ) -> CitationVerification:
+        return cls(
+            file_path=citation.file_path,
+            start_line=citation.start_line,
+            end_line=citation.end_line,
+            verified=verified,
+            reason=reason,
+            chunk_id=chunk_id,
+        )
 
 
 @dataclass
@@ -80,6 +110,7 @@ class Response:
     grounded: bool
     query_id: str = ""
     confidence_score: float = 0.0
+    citation_verifications: list[CitationVerification] = field(default_factory=list)
 
     @property
     def has_evidence(self) -> bool:

@@ -24,6 +24,7 @@ from coderag.models.query import Query
 from coderag.models.repository import Repository, RepositoryStatus
 from coderag.services.providers import ProviderConfigService
 from coderag.services.registry import RepositoryRegistry
+from coderag.ui.grounding import format_grounding_status
 
 logger = get_logger(__name__)
 
@@ -470,7 +471,11 @@ class UIHandlers:
             # Format evidence
             evidence_md = response.format_evidence()
 
-            status = "Grounded" if response.grounded else "Not grounded (no citations)"
+            status = format_grounding_status(
+                grounded=response.grounded,
+                has_citations=bool(response.citations),
+                has_citation_verifications=bool(response.citation_verifications),
+            )
 
             return answer_md, evidence_md, status
 

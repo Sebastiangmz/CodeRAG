@@ -1,5 +1,6 @@
 """Unit tests for service-backed MCP handlers."""
-
+# mypy: disable-error-code="no-untyped-def,arg-type,no-untyped-call,index,union-attr"
+import json
 from datetime import datetime
 from types import SimpleNamespace
 
@@ -7,6 +8,7 @@ import pytest
 
 from coderag.mcp.handlers import MCPHandlers, get_mcp_handlers
 from coderag.models.repository import Repository, RepositoryStatus
+from coderag.models.response import Citation, CitationVerification
 from coderag.services.registry import RepositoryRegistry
 
 
@@ -59,7 +61,15 @@ class FakeRetrievalService:
             return SimpleNamespace(response=None, repo=None, error=f"Repository not found: {repo_id}")
         if repo.status is not RepositoryStatus.READY:
             return SimpleNamespace(response=None, repo=repo, error=f"Repository not ready: status is {repo.status.value}")
-        response = SimpleNamespace(answer="Test answer", citations=[], retrieved_chunks=[], grounded=False)
+        response = SimpleNamespace(
+            answer="Test answer",
+            citations=[Citation(file_path="src/app.py", start_line=1, end_line=2)],
+            retrieved_chunks=[],
+            grounded=True,
+            citation_verifications=[
+                CitationVerification(file_path="src/app.py", start_line=1, end_line=2, verified=True, reason="verified")
+            ],
+        )
         return SimpleNamespace(response=response, repo=repo, error=None)
 
     def search_code(self, repo_id: str, query: str, top_k: int = 10, file_filter=None, chunk_type=None):
@@ -223,9 +233,23 @@ class TestQueryCode:
         result = await mcp_handlers.query_code(sample_repository.id, "What does this do?", top_k=3)
 
         assert result["answer"] == "Test answer"
-        assert result["citations"] == []
+        assert result["citations"] == [{"file_path": "src/app.py", "start_line": 1, "end_line": 2}]
         assert result["evidence"] == []
-        assert result["grounded"] is False
+        assert result["grounded"] is True
+        assert result["citation_verifications"][0]["file_path"] == "src/app.py"
+        assert result["citation_verifications"][0]["verified"] is True
+
+    @pytest.mark.asyncio
+    async def test_query_code_result_is_json_serializable_with_citations(self, mcp_handlers, registry, sample_repository):
+        registry.add(sample_repository)
+
+        result = await mcp_handlers.query_code(sample_repository.id, "How does app work?")
+
+        encoded = json.dumps(result)
+        decoded = json.loads(encoded)
+        assert decoded["citations"] == [{"file_path": "src/app.py", "start_line": 1, "end_line": 2}]
+        assert decoded["citation_verifications"][0]["reason"] == "verified"
+        assert result["citation_verifications"][0]["reason"] == "verified"
 
 
 

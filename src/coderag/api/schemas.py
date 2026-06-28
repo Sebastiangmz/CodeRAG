@@ -1,18 +1,17 @@
 """Pydantic schemas for REST API."""
 
 from datetime import datetime
-from typing import Optional
 
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class IndexRepositoryRequest(BaseModel):
     """Request to index a repository."""
 
     url: str = Field(..., description="GitHub repository URL")
-    branch: Optional[str] = Field(None, description="Branch name (default: main)")
-    include_patterns: Optional[list[str]] = Field(None, description="File patterns to include")
-    exclude_patterns: Optional[list[str]] = Field(None, description="File patterns to exclude")
+    branch: str | None = Field(None, description="Branch name (default: main)")
+    include_patterns: list[str] | None = Field(None, description="File patterns to include")
+    exclude_patterns: list[str] | None = Field(None, description="File patterns to exclude")
 
 
 class IndexRepositoryResponse(BaseModel):
@@ -38,8 +37,19 @@ class CitationResponse(BaseModel):
     start_line: int
     end_line: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
+
+class CitationVerificationResponse(BaseModel):
+    """Verification status for a parsed citation."""
+
+    file_path: str
+    start_line: int
+    end_line: int
+    verified: bool
+    reason: str
+    chunk_id: str | None = None
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class RetrievedChunkResponse(BaseModel):
@@ -51,11 +61,9 @@ class RetrievedChunkResponse(BaseModel):
     end_line: int
     relevance_score: float
     chunk_type: str
-    name: Optional[str] = None
+    name: str | None = None
     content: str
-
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class QueryResponse(BaseModel):
@@ -63,10 +71,13 @@ class QueryResponse(BaseModel):
 
     answer: str = Field(..., description="Generated answer")
     citations: list[CitationResponse] = Field(..., description="Citations in the answer")
+    citation_verifications: list[CitationVerificationResponse] = Field(
+        default_factory=list,
+        description="Verification status for each parsed citation",
+    )
     retrieved_chunks: list[RetrievedChunkResponse] = Field(..., description="Evidence chunks")
-    grounded: bool = Field(..., description="Whether response is grounded in evidence")
+    grounded: bool = Field(..., description="Whether every parsed citation is verified against retrieved evidence")
     query_id: str = Field(..., description="Query ID")
-
 
 class RepositoryInfo(BaseModel):
     """Repository information."""
@@ -76,8 +87,8 @@ class RepositoryInfo(BaseModel):
     branch: str
     chunk_count: int
     status: str
-    indexed_at: Optional[datetime] = None
-    error_message: Optional[str] = None
+    indexed_at: datetime | None = None
+    error_message: str | None = None
 
 
 class ListRepositoriesResponse(BaseModel):
@@ -98,4 +109,4 @@ class ErrorResponse(BaseModel):
     """Error response."""
 
     error: str
-    detail: Optional[str] = None
+    detail: str | None = None

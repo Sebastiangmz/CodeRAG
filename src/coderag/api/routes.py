@@ -1,9 +1,12 @@
 """REST API routes."""
 
+from typing import Any
+
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 
 from coderag.api.schemas import (
     CitationResponse,
+    CitationVerificationResponse,
     IndexRepositoryRequest,
     IndexRepositoryResponse,
     ListRepositoriesResponse,
@@ -13,6 +16,7 @@ from coderag.api.schemas import (
     RetrievedChunkResponse,
 )
 from coderag.logging import get_logger
+from coderag.models.repository import Repository
 from coderag.services.indexing import IndexingOptions, IndexingService
 from coderag.services.registry import RepositoryRegistry
 from coderag.services.retrieval import RetrievalService
@@ -25,12 +29,29 @@ indexing_service = IndexingService(registry=registry)
 retrieval_service = RetrievalService(registry=registry)
 
 
-def get_repo_or_404(repo_id: str):
+def get_repo_or_404(repo_id: str) -> Repository:
     """Get a repository by full ID or unambiguous prefix, raising 404 if not found."""
     repo = registry.get_unique(repo_id)
     if repo is None:
         raise HTTPException(status_code=404, detail="Repository not found")
     return repo
+
+
+def _read_field(item: Any, field: str, default: Any = None) -> Any:
+    if isinstance(item, dict):
+        return item.get(field, default)
+    return getattr(item, field, default)
+
+
+def _citation_verification_response(item: Any) -> CitationVerificationResponse:
+    return CitationVerificationResponse(
+        file_path=_read_field(item, "file_path"),
+        start_line=_read_field(item, "start_line"),
+        end_line=_read_field(item, "end_line"),
+        verified=_read_field(item, "verified"),
+        reason=_read_field(item, "reason"),
+        chunk_id=_read_field(item, "chunk_id"),
+    )
 
 
 async def index_repository_task(
@@ -119,6 +140,10 @@ async def query_repository(request: QueryRequest) -> QueryResponse:
             )
             for c in response.citations
         ],
+        citation_verifications=[
+            _citation_verification_response(verification)
+            for verification in getattr(response, "citation_verifications", [])
+        ],
         retrieved_chunks=[
             RetrievedChunkResponse(
                 chunk_id=c.chunk_id,
@@ -172,7 +197,7 @@ async def get_repository(repo_id: str) -> RepositoryInfo:
 
 
 @router.delete("/repos/{repo_id}")
-async def delete_repository(repo_id: str) -> dict:
+async def delete_repository(repo_id: str) -> dict[str, str]:
     """Delete a repository by full ID or prefix."""
     repo = get_repo_or_404(repo_id)
     try:

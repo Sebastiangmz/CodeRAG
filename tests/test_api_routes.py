@@ -86,10 +86,16 @@ class FakeGeneratedResponse:
     retrieved_chunks: list = None
     grounded: bool = False
     query_id: str = "query-1"
+    citation_verifications: list = None
 
     def __post_init__(self) -> None:
         self.citations = [] if self.citations is None else self.citations
         self.retrieved_chunks = [] if self.retrieved_chunks is None else self.retrieved_chunks
+        self.citation_verifications = (
+            [{"file_path": "src/app.py", "start_line": 1, "end_line": 2, "verified": True, "reason": "verified"}]
+            if self.citation_verifications is None
+            else self.citation_verifications
+        )
 
 
 class FakeRetrievalService:
@@ -136,6 +142,9 @@ async def test_query_route_uses_retrieval_service_and_preserves_response(monkeyp
     assert response.answer == "shared answer"
     assert response.query_id == "query-1"
     assert retrieval.calls == [("repo-ready", "How?", 3)]
+    assert response.citation_verifications[0].file_path == "src/app.py"
+    assert response.citation_verifications[0].verified is True
+    assert response.citation_verifications[0].reason == "verified"
 
 
 @pytest.mark.asyncio

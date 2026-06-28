@@ -9,6 +9,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 HANDLERS_PATH = REPO_ROOT / "src" / "coderag" / "ui" / "handlers.py"
 METADATA_PATH = REPO_ROOT / "src" / "coderag" / "ui" / "repository_metadata.py"
+GROUNDING_PATH = REPO_ROOT / "src" / "coderag" / "ui" / "grounding.py"
 
 
 def _load_metadata_module():
@@ -49,6 +50,24 @@ def test_ui_ask_question_checks_provider_profile_before_generation_setup():
     assert call_names.index("generation_block_reason") < call_names.index("ResponseGenerator")
     assert call_names.index("generation_block_reason") < call_names.index("generate")
 
+
+def test_ui_grounding_status_uses_verified_citation_state():
+    spec = importlib.util.spec_from_file_location("coderag_ui_grounding_under_test", GROUNDING_PATH)
+    assert spec is not None
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    format_grounding_status = module.format_grounding_status
+
+    assert format_grounding_status(grounded=True, has_citations=True, has_citation_verifications=True) == "Grounded (verified citations)"
+    assert (
+        format_grounding_status(grounded=False, has_citations=True, has_citation_verifications=True)
+        == "Not grounded (unverified citations)"
+    )
+    assert (
+        format_grounding_status(grounded=False, has_citations=False, has_citation_verifications=False)
+        == "Not grounded (no verified citations)"
+    )
 
 def test_ui_repository_state_uses_shared_registry_not_json_helpers():
     module = ast.parse(HANDLERS_PATH.read_text())

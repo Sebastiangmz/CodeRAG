@@ -1,7 +1,7 @@
 """Run the committed deterministic subset of the EvalFly smoke suite.
 
 This CI helper is intentionally narrow: it validates the repository-local EvalFly
-configuration enough to execute deterministic `file_exists` assertions in GitHub
+configuration enough to execute deterministic repository-local assertions in GitHub
 Actions, while the full OMP EvalFly CLI remains the authoritative local tool.
 """
 
@@ -56,13 +56,28 @@ def _run_case(case: dict[str, Any]) -> None:
     for assertion in assertions:
         if not isinstance(assertion, dict):
             raise SmokeFailure(f"{case_id}: assertion must be an object")
-        if assertion.get("type") != "file_exists":
-            raise SmokeFailure(f"{case_id}: unsupported assertion type {assertion.get('type')!r}")
+        assertion_type = assertion.get("type")
         raw_path = assertion.get("path")
         if not isinstance(raw_path, str) or not raw_path:
-            raise SmokeFailure(f"{case_id}: file_exists assertion requires a path")
-        if not (REPO_ROOT / raw_path).is_file():
-            raise SmokeFailure(f"{case_id}: expected file does not exist: {raw_path}")
+            raise SmokeFailure(f"{case_id}: assertion requires a path")
+        path = REPO_ROOT / raw_path
+
+        if assertion_type == "file_exists":
+            if not path.is_file():
+                raise SmokeFailure(f"{case_id}: expected file does not exist: {raw_path}")
+            continue
+
+        if assertion_type == "file_contains":
+            expected_text = assertion.get("text")
+            if not isinstance(expected_text, str) or not expected_text:
+                raise SmokeFailure(f"{case_id}: file_contains assertion requires text")
+            if not path.is_file():
+                raise SmokeFailure(f"{case_id}: expected file does not exist: {raw_path}")
+            if expected_text not in path.read_text():
+                raise SmokeFailure(f"{case_id}: expected {raw_path} to contain {expected_text!r}")
+            continue
+
+        raise SmokeFailure(f"{case_id}: unsupported assertion type {assertion_type!r}")
 
 
 def run_smoke() -> int:

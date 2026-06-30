@@ -1,0 +1,23 @@
+{
+  "schema_version": "evalfly.run.v1",
+  "run_id": "20260630-m7-production-rc",
+  "suite": "smoke",
+  "milestone": "M7",
+  "status": "PASS",
+  "cases_passed": 33,
+  "cases_failed": 0,
+  "evidence": [
+    {
+      "command": ".venv/bin/python scripts/evalfly_smoke.py --suite smoke",
+      "observed": "evalfly committed smoke passed: 33 cases"
+    },
+    {
+      "command": "PYTHONPATH=src .venv/bin/python -m pytest tests/test_m0_baseline.py tests/test_m1_services.py tests/test_m2_registry.py tests/test_citations.py tests/test_m3_citations.py tests/test_api_routes.py tests/test_mcp_handlers.py tests/test_mcp_tools.py tests/test_ui_handlers.py tests/test_m4_hybrid_retrieval.py tests/test_m5_code_graph.py tests/test_m6_interfaces_docs.py",
+      "observed": "103 passed"
+    },
+    {
+      "command": "clean wheel install in /tmp/coderag-m7-venv; coderag --help; import coderag",
+      "observed": "wheel installed, CLI listed production interface commands, coderag.__version__ printed 0.1.2"
+    }
+  ]
+}

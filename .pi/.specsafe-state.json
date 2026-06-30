@@ -159,6 +159,26 @@
           "turns": 0
         }
       }
+    },
+    {
+      "sliceId": "CRAG-20260630-M6-PRODUCTION-INTERFACES",
+      "workspaceId": "CodeRAG",
+      "sessionId": "omp-session",
+      "beganAt": "2026-06-30T21:35:47.487Z",
+      "endedAt": "2026-06-30T21:40:17.045Z",
+      "outcome": "PASS",
+      "costSummary": {
+        "externalMemoryCalls": 0,
+        "externalMemoryCost": 0,
+        "subagentTokens": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "cost": 0,
+          "turns": 0
+        }
+      }
     }
   ]
 }

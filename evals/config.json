@@ -770,6 +770,102 @@
           }
         ]
       }
+    },
+    {
+      "schema_version": "evalfly.case.v1",
+      "case_id": "m6-production-interfaces-contract-exists",
+      "title": "Milestone 6 production interfaces contract exists",
+      "suite": "smoke",
+      "risk_tier": "critical",
+      "task_type": "delivery_governance",
+      "source": {
+        "kind": "acceptance_criteria",
+        "criteria": "M6-AC1 M6-AC2 M6-AC3 M6-AC4"
+      },
+      "privacy": {
+        "classification": "public",
+        "sanitized": true
+      },
+      "expected": {
+        "success_criteria": [
+          "The Milestone 6 interface and documentation contract is committed."
+        ]
+      },
+      "judge": {
+        "type": "deterministic",
+        "assertions": [
+          {
+            "type": "file_exists",
+            "path": "docs/superpowers/plans/2026-06-30-m6-production-interfaces-contract.md"
+          }
+        ]
+      }
+    },
+    {
+      "schema_version": "evalfly.case.v1",
+      "case_id": "m6-hybrid-search-interface-exists",
+      "title": "Hybrid search interface exists across adapters",
+      "suite": "smoke",
+      "risk_tier": "critical",
+      "task_type": "adapter_contract",
+      "source": {
+        "kind": "acceptance_criteria",
+        "criteria": "M6-AC1 M6-AC2"
+      },
+      "privacy": {
+        "classification": "public",
+        "sanitized": true
+      },
+      "expected": {
+        "success_criteria": [
+          "REST and CLI expose hybrid retrieval without generation."
+        ]
+      },
+      "judge": {
+        "type": "deterministic",
+        "assertions": [
+          {
+            "type": "file_contains",
+            "path": "src/coderag/api/routes.py",
+            "text": "@router.post(\"/search-hybrid\""
+          },
+          {
+            "type": "file_contains",
+            "path": "src/coderag/cli.py",
+            "text": "@cli.command(\"search-hybrid\")"
+          }
+        ]
+      }
+    },
+    {
+      "schema_version": "evalfly.case.v1",
+      "case_id": "m6-targeted-tests-exist",
+      "title": "Milestone 6 targeted interface tests exist",
+      "suite": "smoke",
+      "risk_tier": "critical",
+      "task_type": "test_coverage",
+      "source": {
+        "kind": "acceptance_criteria",
+        "criteria": "M6-AC2 M6-AC3 M6-AC4"
+      },
+      "privacy": {
+        "classification": "public",
+        "sanitized": true
+      },
+      "expected": {
+        "success_criteria": [
+          "Targeted interface and README contract tests are committed."
+        ]
+      },
+      "judge": {
+        "type": "deterministic",
+        "assertions": [
+          {
+            "type": "file_exists",
+            "path": "tests/test_m6_interfaces_docs.py"
+          }
+        ]
+      }
     }
   ]
 }

@@ -90,6 +90,60 @@ class FakeRetrievalService:
             )
         ]
 
+    def search_hybrid(self, repo_id: str, query: str, top_k: int = 10, max_tokens: int = 4000, max_chunks_per_file: int = 3):
+        _ = (query, top_k, max_tokens, max_chunks_per_file)
+        repo = self.registry.get(repo_id)
+        if repo is None:
+            raise ValueError(f"Repository not found: {repo_id}")
+        return [
+            SimpleNamespace(
+                chunk_id="chunk-1",
+                file_path="src/app.py",
+                start_line=1,
+                end_line=3,
+                chunk_type="function",
+                name="app",
+                content="def app(): pass",
+                relevance_score=0.9,
+                score_breakdown={"vector": 0.2, "lexical": 1.0, "combined": 0.62},
+                retrieval_sources=["lexical"],
+                token_estimate=3,
+                ranking_reason="lexical=1.000",
+            )
+        ]
+
+    def get_context_pack(self, repo_id: str, query: str, top_k: int = 10, max_tokens: int = 4000, max_chunks_per_file: int = 3):
+        _ = (top_k, max_tokens, max_chunks_per_file)
+        repo = self.registry.get(repo_id)
+        if repo is None:
+            raise ValueError(f"Repository not found: {repo_id}")
+        return SimpleNamespace(
+            repo_id=repo_id,
+            query=query,
+            token_estimate=3,
+            budget={"max_chunks": 10, "max_tokens": max_tokens, "max_chunks_per_file": max_chunks_per_file},
+            capabilities={"generation_required": False, "retrieval": "hybrid"},
+            to_dict=lambda: {
+                "repo_id": repo_id,
+                "query": query,
+                "token_estimate": 3,
+                "budget": {"max_chunks": 10, "max_tokens": max_tokens, "max_chunks_per_file": max_chunks_per_file},
+                "capabilities": {"generation_required": False, "retrieval": "hybrid"},
+                "snippets": [
+                    {
+                        "chunk_id": "chunk-1",
+                        "file_path": "src/app.py",
+                        "start_line": 1,
+                        "end_line": 3,
+                        "citation": "[src/app.py:1-3]",
+                        "content": "def app(): pass",
+                        "retrieval_sources": ["lexical"],
+                        "token_estimate": 3,
+                    }
+                ],
+            },
+        )
+
 
 @pytest.fixture
 def registry(tmp_path):
@@ -276,6 +330,33 @@ class TestSearchCode:
             "content": "def app(): pass",
             "relevance_score": 0.876,
         }
+
+
+class TestHybridSearchAndContextPack:
+    @pytest.mark.asyncio
+    async def test_search_hybrid_success_shape(self, mcp_handlers, registry, sample_repository):
+        registry.add(sample_repository)
+
+        result = await mcp_handlers.search_hybrid(sample_repository.id, "app function", top_k=1)
+
+        assert result["count"] == 1
+        assert result["results"][0]["file_path"] == "src/app.py"
+        assert result["results"][0]["score_breakdown"]["lexical"] == 1.0
+        assert result["results"][0]["retrieval_sources"] == ["lexical"]
+        assert result["results"][0]["ranking_reason"] == "lexical=1.000"
+
+    @pytest.mark.asyncio
+    async def test_context_pack_success_shape_and_json_serializable(self, mcp_handlers, registry, sample_repository):
+        registry.add(sample_repository)
+
+        result = await mcp_handlers.get_context_pack(sample_repository.id, "app function", top_k=1, max_tokens=1000)
+
+        encoded = json.dumps(result)
+        decoded = json.loads(encoded)
+        assert decoded["repo_id"] == sample_repository.id
+        assert decoded["query"] == "app function"
+        assert decoded["capabilities"]["generation_required"] is False
+        assert decoded["snippets"][0]["citation"] == "[src/app.py:1-3]"
 
 
 

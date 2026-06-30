@@ -1,10 +1,10 @@
-# CodeRAG - Code Q&A with Verifiable Citations
+# CodeRAG - Verified Codebase Context Engine
 
 [![PyPI version](https://badge.fury.io/py/code-rag-me.svg)](https://pypi.org/project/code-rag-me/)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-RAG-based Q&A system for code repositories that provides grounded answers with verifiable citations.
+CodeRAG is a verified codebase context engine for agents and developers. It indexes repositories, retrieves grounded code context, verifies citations against retrieved chunks, and exposes the results through CLI, REST, MCP, and a local web UI. It is not an autonomous coding agent and does not edit repositories.
 
 ## 🚀 Quick Start
 
@@ -34,26 +34,32 @@ Now you can use CodeRAG directly in Claude Desktop!
 
 ## ✨ Features
 
-- **Grounded Responses**: Every answer includes citations to source code `[file:start-end]`
-- **Cloud or Local LLM**: Use Groq (free), OpenAI, Anthropic, or run locally with GPU
-- **GitHub Integration**: Index any public GitHub repository
-- **MCP Support**: Integrate directly with Claude Desktop
-- **Semantic Chunking**: Tree-sitter for Python, text fallback for other languages
-- **Web Interface**: Gradio UI for easy interaction
-- **REST API**: Programmatic access for integration
-- **CLI**: Full command-line interface
+- **Verified citations**: Answers include citations like `[file:start-end]` and expose verification status.
+- **Hybrid retrieval and context packs**: Combine semantic and lexical retrieval without requiring generation.
+- **Code graph intelligence**: Python and TypeScript/JavaScript symbols, references, and blast-radius evidence are indexed when supported.
+- **Cloud or local LLM**: Use Groq, OpenAI, Anthropic, OpenRouter, Together, or explicitly configured local models.
+- **GitHub indexing**: Index public GitHub repositories with durable SQLite registry/job state.
+- **MCP support**: Expose indexing, retrieval, context, and graph tools to MCP clients.
+- **REST API and CLI**: Programmatic and terminal access to the same core capabilities.
+- **Local web interface**: Gradio UI for local exploration.
 
 ## 📋 CLI Commands
 
 ```bash
-coderag setup              # Configure LLM provider and API key
-coderag serve              # Start web server
-coderag mcp-install        # Configure Claude Desktop for MCP
-coderag mcp-run            # Run MCP server (used by Claude Desktop)
-coderag index <url>        # Index a GitHub repository
-coderag query <repo> "?"   # Ask a question about code
-coderag repos              # List indexed repositories
-coderag doctor             # Diagnose setup issues
+coderag setup                         # Configure LLM provider and API key
+coderag serve                         # Start local web/API/MCP server
+coderag mcp-install                   # Configure Claude Desktop for MCP
+coderag mcp-run                       # Run MCP server over stdio
+coderag index <url>                   # Index a GitHub repository
+coderag update <repo>                 # Incrementally update an indexed repository
+coderag query <repo> "?"              # Ask a question with citations
+coderag search-hybrid <repo> "query"  # Retrieve hybrid code context without generation
+coderag context-pack <repo> "query"   # Build an agent-ready context pack
+coderag find-symbol <repo> <symbol>   # Find indexed graph symbols
+coderag find-references <repo> <sym>  # Find indexed symbol references
+coderag blast-radius <repo> <symbol>  # Show graph-backed impacted files/tests
+coderag repos                         # List indexed repositories
+coderag doctor                        # Diagnose setup issues
 ```
 
 ## 🔧 Installation
@@ -229,8 +235,17 @@ This will prompt you to:
 # Index a repository
 coderag index https://github.com/owner/repo
 
-# Ask questions
-coderag query abc12345 "How does authentication work?"
+# Ask questions with citation verification metadata
+coderag query abc12345 "How does authentication work?" --format json
+
+# Retrieve context without calling an LLM
+coderag search-hybrid abc12345 "authentication flow" --format json
+coderag context-pack abc12345 "authentication flow"
+
+# Inspect graph evidence
+coderag find-symbol abc12345 AuthService --format json
+coderag find-references abc12345 validate_token --format json
+coderag blast-radius abc12345 validate_token --format json
 
 # List repositories
 coderag repos
@@ -244,10 +259,20 @@ curl -X POST http://localhost:8000/api/v1/repos/index \
   -H "Content-Type: application/json" \
   -d '{"url": "https://github.com/owner/repo"}'
 
-# Query
+# Query with citation verification
 curl -X POST http://localhost:8000/api/v1/query \
   -H "Content-Type: application/json" \
   -d '{"question": "How does X work?", "repo_id": "abc12345"}'
+
+# Hybrid retrieval without generation
+curl -X POST http://localhost:8000/api/v1/search-hybrid \
+  -H "Content-Type: application/json" \
+  -d '{"query": "authentication flow", "repo_id": "abc12345", "top_k": 5}'
+
+# Graph-backed blast radius
+curl -X POST http://localhost:8000/api/v1/graph/blast-radius \
+  -H "Content-Type: application/json" \
+  -d '{"symbol": "validate_token", "repo_id": "abc12345"}'
 ```
 
 ### Claude Desktop (MCP)
@@ -289,6 +314,14 @@ SERVER_PORT=8000
 ### Config File
 
 Configuration is stored in `~/.config/coderag/config.json` after running `coderag setup`.
+
+## Production readiness
+
+Current release-candidate work is evidence-gated. The supported default is local loopback (`127.0.0.1`) with user-configured model credentials. Binding to public interfaces requires explicit host, trusted CORS origins, authentication, and network controls outside CodeRAG's defaults.
+
+- Cloud LLM providers send prompt context to the selected provider. Use local/private profiles only when configured and verified for your environment.
+- Unsupported graph languages degrade explicitly to text/chunk retrieval; they do not report fake graph confidence.
+- CodeRAG verifies citations against retrieved chunks, but it does not prove repository correctness, execute arbitrary project tests, or make autonomous code changes.
 
 ## 🏗️ Architecture
 

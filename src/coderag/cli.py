@@ -390,6 +390,44 @@ def query(repo_id: str, question: str, top_k: int, output_format: str):
 
 
 
+@cli.command("search-hybrid")
+@click.argument("repo_id")
+@click.argument("query_text")
+@click.option("--top-k", default=10, type=int, help="Maximum results to include")
+@click.option("--max-tokens", default=4000, type=int, help="Maximum token estimate")
+@click.option("--max-chunks-per-file", default=3, type=int, help="Maximum results per file")
+@click.option("--format", "output_format", type=click.Choice(["text", "json"]), default="text", help="Output format")
+def search_hybrid(repo_id: str, query_text: str, top_k: int, max_tokens: int, max_chunks_per_file: int, output_format: str):
+    """Run hybrid retrieval without LLM generation."""
+    _apply_config_to_env()
+
+    import asyncio
+
+    from coderag.mcp.handlers import get_mcp_handlers
+
+    async def run_search_hybrid():
+        return await get_mcp_handlers().search_hybrid(
+            repo_id=repo_id,
+            query=query_text,
+            top_k=top_k,
+            max_tokens=max_tokens,
+            max_chunks_per_file=max_chunks_per_file,
+        )
+
+    result = asyncio.run(run_search_hybrid())
+    if result.get("error"):
+        click.echo(f"❌ Error: {result['error']}")
+        sys.exit(1)
+    if output_format == "json":
+        click.echo(json.dumps(result, indent=2))
+        return
+    click.echo(f"Hybrid results for {query_text}: {result.get('count', 0)}")
+    for chunk in result.get("results", []):
+        citation = chunk.get("citation") or f"[{chunk['file_path']}:{chunk['start_line']}-{chunk['end_line']}]"
+        sources = ", ".join(chunk.get("retrieval_sources", [])) or "none"
+        click.echo(f"- {citation} sources={sources}")
+
+
 @cli.command("context-pack")
 @click.argument("repo_id")
 @click.argument("query_text")

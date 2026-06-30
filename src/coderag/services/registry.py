@@ -13,6 +13,7 @@ from uuid import uuid4
 from coderag.config import get_settings
 from coderag.logging import get_logger
 from coderag.models.chunk import Chunk
+from coderag.models.graph import CodeEdge, CodeSymbol, FileGraph
 from coderag.models.repository import Repository
 
 logger = get_logger(__name__)
@@ -368,6 +369,79 @@ class RepositoryRegistry:
             ).fetchall()
         return [self._chunk_from_row(row) for row in rows]
 
+    def replace_graph_file(self, repo_id: str, file_path: str, graph: FileGraph) -> None:
+        """Replace persisted graph facts for one repository file."""
+        with self._connect() as conn:
+            conn.execute("DELETE FROM code_graph_edges WHERE repo_id = ? AND file_path = ?", (repo_id, file_path))
+            conn.execute("DELETE FROM code_graph_symbols WHERE repo_id = ? AND file_path = ?", (repo_id, file_path))
+            for symbol in graph.symbols:
+                conn.execute(
+                    """
+                    INSERT INTO code_graph_symbols (
+                        repo_id, file_path, name, kind, language, start_line, end_line, container
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        symbol.repo_id,
+                        symbol.file_path,
+                        symbol.name,
+                        symbol.kind,
+                        symbol.language,
+                        symbol.start_line,
+                        symbol.end_line,
+                        symbol.container,
+                    ),
+                )
+            for edge in graph.edges:
+                conn.execute(
+                    """
+                    INSERT INTO code_graph_edges (
+                        repo_id, file_path, edge_type, target_name, start_line, end_line, source_name
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        edge.repo_id,
+                        edge.file_path,
+                        edge.edge_type,
+                        edge.target_name,
+                        edge.start_line,
+                        edge.end_line,
+                        edge.source_name,
+                    ),
+                )
+
+    def clear_graph_metadata(self, repo_id: str) -> None:
+        """Delete all graph facts for a repository."""
+        with self._connect() as conn:
+            conn.execute("DELETE FROM code_graph_edges WHERE repo_id = ?", (repo_id,))
+            conn.execute("DELETE FROM code_graph_symbols WHERE repo_id = ?", (repo_id,))
+
+    def find_graph_symbols(self, repo_id: str, symbol_name: str) -> list_type[CodeSymbol]:
+        """Find symbols by exact name in a repository."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT * FROM code_graph_symbols
+                WHERE repo_id = ? AND name = ?
+                ORDER BY file_path, start_line
+                """,
+                (repo_id, symbol_name),
+            ).fetchall()
+        return [self._graph_symbol_from_row(row) for row in rows]
+
+    def find_graph_edges(self, repo_id: str, target_name: str) -> list_type[CodeEdge]:
+        """Find edges pointing at a symbol name in a repository."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT * FROM code_graph_edges
+                WHERE repo_id = ? AND target_name = ?
+                ORDER BY file_path, start_line, edge_type
+                """,
+                (repo_id, target_name),
+            ).fetchall()
+        return [self._graph_edge_from_row(row) for row in rows]
+
     def _connect(self) -> sqlite3.Connection:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         conn = sqlite3.connect(self.db_path)
@@ -428,6 +502,31 @@ class RepositoryRegistry:
                     FOREIGN KEY (repo_id) REFERENCES repositories(id) ON DELETE CASCADE
                 );
 
+
+                CREATE TABLE IF NOT EXISTS code_graph_symbols (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    repo_id TEXT NOT NULL,
+                    file_path TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    kind TEXT NOT NULL,
+                    language TEXT,
+                    start_line INTEGER NOT NULL,
+                    end_line INTEGER NOT NULL,
+                    container TEXT,
+                    FOREIGN KEY (repo_id) REFERENCES repositories(id) ON DELETE CASCADE
+                );
+
+                CREATE TABLE IF NOT EXISTS code_graph_edges (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    repo_id TEXT NOT NULL,
+                    file_path TEXT NOT NULL,
+                    edge_type TEXT NOT NULL,
+                    target_name TEXT NOT NULL,
+                    start_line INTEGER NOT NULL,
+                    end_line INTEGER NOT NULL,
+                    source_name TEXT,
+                    FOREIGN KEY (repo_id) REFERENCES repositories(id) ON DELETE CASCADE
+                );
                 CREATE TABLE IF NOT EXISTS index_jobs (
                     id TEXT PRIMARY KEY,
                     repo_id TEXT,
@@ -571,4 +670,28 @@ class RepositoryRegistry:
             name=row["name"],
             content_hash=row["content_hash"],
             metadata_json=row["metadata_json"],
+        )
+
+
+    def _graph_symbol_from_row(self, row: sqlite3.Row) -> CodeSymbol:
+        return CodeSymbol(
+            repo_id=row["repo_id"],
+            file_path=row["file_path"],
+            name=row["name"],
+            kind=row["kind"],
+            language=row["language"],
+            start_line=row["start_line"],
+            end_line=row["end_line"],
+            container=row["container"],
+        )
+
+    def _graph_edge_from_row(self, row: sqlite3.Row) -> CodeEdge:
+        return CodeEdge(
+            repo_id=row["repo_id"],
+            file_path=row["file_path"],
+            edge_type=row["edge_type"],
+            target_name=row["target_name"],
+            start_line=row["start_line"],
+            end_line=row["end_line"],
+            source_name=row["source_name"],
         )

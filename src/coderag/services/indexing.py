@@ -7,9 +7,11 @@ from pathlib import Path
 from typing import Any, cast
 
 from coderag.config import get_settings
+from coderag.graph.extractor import CodeGraphExtractor
 from coderag.logging import get_logger
 from coderag.models.chunk import Chunk
 from coderag.models.document import Document
+from coderag.models.graph import FileGraph
 from coderag.models.repository import Repository, RepositoryStatus
 from coderag.services.registry import RepositoryRegistry
 
@@ -70,6 +72,7 @@ class IndexingService:
         chunker: Any | None = None,
         embedder: Any | None = None,
         vectorstore: Any | None = None,
+        graph_extractor: CodeGraphExtractor | None = None,
         commit_resolver: Callable[[Path], str | None] | None = None,
     ) -> None:
         self.settings = get_settings()
@@ -81,6 +84,7 @@ class IndexingService:
         self.embedder = embedder
         self.vectorstore = vectorstore
         self.commit_resolver = commit_resolver or self._get_current_commit
+        self.graph_extractor = graph_extractor or CodeGraphExtractor()
 
     async def index_repository(self, url: str, options: IndexingOptions | None = None) -> IndexingResult:
         """Async-compatible full indexing entrypoint."""
@@ -153,6 +157,7 @@ class IndexingService:
             self._get_vectorstore().delete_repo_chunks(repo.id)
             self.registry.clear_file_metadata(repo.id)
             self.registry.clear_chunk_metadata(repo.id)
+            self.registry.clear_graph_metadata(repo.id)
             for file_path in files:
                 relative_path = str(file_path.relative_to(repo_path))
                 self.registry.record_file_metadata(repo.id, relative_path, size_bytes=file_path.stat().st_size)
@@ -187,6 +192,8 @@ class IndexingService:
         for file_path in files:
             try:
                 document = Document.from_file(file_path, repo_path, repo_id)
+                graph = self.graph_extractor.extract(document)
+                self.registry.replace_graph_file(repo_id, document.file_path, graph)
                 for chunk in self._get_chunker().chunk_document(document):
                     chunk.repo_id = repo_id
                     batch.append(chunk)
@@ -262,6 +269,7 @@ class IndexingService:
             for file_path in deleted | modified:
                 count = self._get_vectorstore().delete_file_chunks(repo.id, file_path)
                 chunks_deleted += count or 0
+                self.registry.replace_graph_file(repo.id, file_path, FileGraph(repo_id=repo.id, file_path=file_path, language=None))
                 self.registry.remove_file_metadata(repo.id, file_path)
 
             file_filter = self._get_file_filter_factory()()

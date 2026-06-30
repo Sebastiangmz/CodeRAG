@@ -35,6 +35,22 @@ def _citation_verification_dict(item: Any) -> dict[str, Any]:
         "chunk_id": _read_field(item, "chunk_id"),
     }
 
+def _retrieved_chunk_dict(chunk: Any) -> dict[str, Any]:
+    return {
+        "chunk_id": _read_field(chunk, "chunk_id"),
+        "file_path": _read_field(chunk, "file_path"),
+        "start_line": _read_field(chunk, "start_line"),
+        "end_line": _read_field(chunk, "end_line"),
+        "chunk_type": _read_field(chunk, "chunk_type"),
+        "name": _read_field(chunk, "name"),
+        "content": _read_field(chunk, "content"),
+        "relevance_score": round(_read_field(chunk, "relevance_score", 0.0) or 0.0, 3),
+        "score_breakdown": _read_field(chunk, "score_breakdown", {}),
+        "retrieval_sources": _read_field(chunk, "retrieval_sources", []),
+        "token_estimate": _read_field(chunk, "token_estimate", 0),
+        "ranking_reason": _read_field(chunk, "ranking_reason"),
+    }
+
 
 class MCPHandlers:
     """Handlers for MCP tools backed by shared application services."""
@@ -240,6 +256,41 @@ class MCPHandlers:
         except Exception as exc:
             logger.error("MCP: Search failed", error=str(exc))
             return {"results": [], "error": str(exc)}
+
+    async def search_hybrid(
+        self,
+        repo_id: str,
+        query: str,
+        top_k: int = 10,
+        max_tokens: int = 4000,
+        max_chunks_per_file: int = 3,
+    ) -> dict[str, Any]:
+        """Hybrid code search without LLM generation."""
+        try:
+            results = self.retrieval_service.search_hybrid(repo_id, query, top_k, max_tokens, max_chunks_per_file)
+            return {
+                "results": [_retrieved_chunk_dict(chunk) for chunk in results],
+                "count": len(results),
+            }
+        except Exception as exc:
+            logger.error("MCP: Hybrid search failed", error=str(exc))
+            return {"results": [], "error": str(exc)}
+
+    async def get_context_pack(
+        self,
+        repo_id: str,
+        query: str,
+        top_k: int = 10,
+        max_tokens: int = 4000,
+        max_chunks_per_file: int = 3,
+    ) -> dict[str, Any]:
+        """Build a hybrid retrieval context pack without LLM generation."""
+        try:
+            pack = self.retrieval_service.get_context_pack(repo_id, query, top_k, max_tokens, max_chunks_per_file)
+            return pack.to_dict()
+        except Exception as exc:
+            logger.error("MCP: Context pack failed", error=str(exc))
+            return {"snippets": [], "error": str(exc)}
 
 
 _mcp_handlers: MCPHandlers | None = None

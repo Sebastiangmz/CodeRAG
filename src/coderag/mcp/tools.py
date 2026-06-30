@@ -137,3 +137,64 @@ async def search_code(
         file_filter=file_filter,
         chunk_type=chunk_type,
     )
+
+
+
+@mcp.tool()
+async def search_hybrid(
+    repo_id: str,
+    query: str,
+    top_k: int = 10,
+    max_tokens: int = 4000,
+    max_chunks_per_file: int = 3,
+) -> dict:
+    """Hybrid code search combining vector and lexical signals without LLM generation.
+
+    Args:
+        repo_id: Repository ID (full or first 8 characters)
+        query: Search query
+        top_k: Maximum number of results (default: 10)
+        max_tokens: Maximum context token estimate
+        max_chunks_per_file: Maximum results from a single file
+
+    Returns:
+        dict with ranked results, score breakdowns, sources, and token estimates
+    """
+    handlers = get_mcp_handlers()
+    return await handlers.search_hybrid(
+        repo_id=repo_id,
+        query=query,
+        top_k=top_k,
+        max_tokens=max_tokens,
+        max_chunks_per_file=max_chunks_per_file,
+    )
+
+
+@mcp.tool()
+async def get_context_pack(
+    repo_id: str,
+    query: str,
+    top_k: int = 10,
+    max_tokens: int = 4000,
+    max_chunks_per_file: int = 3,
+) -> dict:
+    """Build a retrieval-only context pack for agents and API clients.
+
+    Args:
+        repo_id: Repository ID (full or first 8 characters)
+        query: Context query
+        top_k: Maximum number of snippets
+        max_tokens: Maximum context token estimate
+        max_chunks_per_file: Maximum snippets from a single file
+
+    Returns:
+        dict with snippets, citations, score breakdowns, budget, and capabilities
+    """
+    handlers = get_mcp_handlers()
+    return await handlers.get_context_pack(
+        repo_id=repo_id,
+        query=query,
+        top_k=top_k,
+        max_tokens=max_tokens,
+        max_chunks_per_file=max_chunks_per_file,
+    )

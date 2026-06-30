@@ -1,13 +1,11 @@
 """Retrieval module for semantic search."""
 
-from typing import Optional
+from typing import Any
 
 from coderag.config import get_settings
-from coderag.indexing.embeddings import EmbeddingGenerator
-from coderag.indexing.vectorstore import VectorStore
 from coderag.logging import get_logger
-from coderag.models.chunk import Chunk
 from coderag.models.response import RetrievedChunk
+from coderag.retrieval.hybrid import HybridRetriever, RetrievalBudget
 
 logger = get_logger(__name__)
 
@@ -17,12 +15,12 @@ class Retriever:
 
     def __init__(
         self,
-        vectorstore: Optional[VectorStore] = None,
-        embedder: Optional[EmbeddingGenerator] = None,
+        vectorstore: Any | None = None,
+        embedder: Any | None = None,
     ) -> None:
         settings = get_settings()
-        self.vectorstore = vectorstore or VectorStore()
-        self.embedder = embedder or EmbeddingGenerator()
+        self.vectorstore = vectorstore or self._default_vectorstore()
+        self.embedder = embedder or self._default_embedder()
         self.default_top_k = settings.retrieval.default_top_k
         self.max_top_k = settings.retrieval.max_top_k
         self.similarity_threshold = settings.retrieval.similarity_threshold
@@ -31,48 +29,43 @@ class Retriever:
         self,
         query: str,
         repo_id: str,
-        top_k: Optional[int] = None,
-        similarity_threshold: Optional[float] = None,
+        top_k: int | None = None,
+        similarity_threshold: float | None = None,
     ) -> list[RetrievedChunk]:
         top_k = min(top_k or self.default_top_k, self.max_top_k)
         threshold = similarity_threshold if similarity_threshold is not None else self.similarity_threshold
 
         logger.info("Retrieving chunks", query=query[:100], repo_id=repo_id, top_k=top_k)
 
-        # Generate query embedding
-        query_embedding = self.embedder.generate_embedding(query, is_query=True)
-
-        # Search vector store
-        results = self.vectorstore.query(
-            query_embedding=query_embedding,
-            repo_id=repo_id,
-            top_k=top_k,
+        retriever = HybridRetriever(
+            vectorstore=self.vectorstore,
+            embedder=self.embedder,
             similarity_threshold=threshold,
         )
-
-        # Convert to RetrievedChunk
-        retrieved_chunks = []
-        for chunk, score in results:
-            retrieved_chunk = RetrievedChunk(
-                chunk_id=chunk.id,
-                content=chunk.content,
-                file_path=chunk.file_path,
-                start_line=chunk.start_line,
-                end_line=chunk.end_line,
-                relevance_score=score,
-                chunk_type=chunk.chunk_type.value,
-                name=chunk.name,
-            )
-            retrieved_chunks.append(retrieved_chunk)
-
+        retrieved_chunks = retriever.retrieve(
+            query=query,
+            repo_id=repo_id,
+            top_k=top_k,
+            budget=RetrievalBudget(max_chunks=top_k, max_tokens=4000, max_chunks_per_file=3),
+        )
         logger.info("Chunks retrieved", count=len(retrieved_chunks))
         return retrieved_chunks
+
+    def _default_vectorstore(self) -> Any:
+        from coderag.indexing.vectorstore import VectorStore
+
+        return VectorStore()
+
+    def _default_embedder(self) -> Any:
+        from coderag.indexing.embeddings import EmbeddingGenerator
+
+        return EmbeddingGenerator()
 
     def retrieve_with_context(
         self,
         query: str,
         repo_id: str,
-        top_k: Optional[int] = None,
+        top_k: int | None = None,
     ) -> tuple[list[RetrievedChunk], str]:
         chunks = self.retrieve(query, repo_id, top_k)
 

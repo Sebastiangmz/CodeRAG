@@ -506,6 +506,138 @@
           }
         ]
       }
+    },
+    {
+      "schema_version": "evalfly.case.v1",
+      "case_id": "m4-contract-exists",
+      "title": "Milestone 4 hybrid retrieval contract exists",
+      "suite": "smoke",
+      "risk_tier": "critical",
+      "task_type": "delivery_governance",
+      "source": {
+        "kind": "acceptance_criteria",
+        "criteria": "M4-AC1 M4-AC2 M4-AC3"
+      },
+      "privacy": {
+        "classification": "public",
+        "sanitized": true
+      },
+      "expected": {
+        "success_criteria": [
+          "The Milestone 4 contract is committed for hybrid retrieval and context packs."
+        ]
+      },
+      "judge": {
+        "type": "deterministic",
+        "assertions": [
+          {
+            "type": "file_exists",
+            "path": "docs/superpowers/plans/2026-06-30-m4-hybrid-retrieval-context-packs-contract.md"
+          }
+        ]
+      }
+    },
+    {
+      "schema_version": "evalfly.case.v1",
+      "case_id": "m4-hybrid-retriever-exists",
+      "title": "Hybrid retriever implementation exists",
+      "suite": "smoke",
+      "risk_tier": "critical",
+      "task_type": "retrieval_quality",
+      "source": {
+        "kind": "acceptance_criteria",
+        "criteria": "M4-AC1 M4-AC2"
+      },
+      "privacy": {
+        "classification": "public",
+        "sanitized": true
+      },
+      "expected": {
+        "success_criteria": [
+          "HybridRetriever is implemented as the retrieval merge seam."
+        ]
+      },
+      "judge": {
+        "type": "deterministic",
+        "assertions": [
+          {
+            "type": "file_contains",
+            "path": "src/coderag/retrieval/hybrid.py",
+            "text": "class HybridRetriever"
+          }
+        ]
+      }
+    },
+    {
+      "schema_version": "evalfly.case.v1",
+      "case_id": "m4-context-pack-api-exists",
+      "title": "Context pack adapters exist",
+      "suite": "smoke",
+      "risk_tier": "critical",
+      "task_type": "adapter_contract",
+      "source": {
+        "kind": "acceptance_criteria",
+        "criteria": "M4-AC3"
+      },
+      "privacy": {
+        "classification": "public",
+        "sanitized": true
+      },
+      "expected": {
+        "success_criteria": [
+          "REST and MCP expose a context pack path without generation."
+        ]
+      },
+      "judge": {
+        "type": "deterministic",
+        "assertions": [
+          {
+            "type": "file_contains",
+            "path": "src/coderag/api/routes.py",
+            "text": "@router.post(\"/context-pack\""
+          },
+          {
+            "type": "file_contains",
+            "path": "src/coderag/mcp/tools.py",
+            "text": "async def get_context_pack"
+          },
+          {
+            "type": "file_contains",
+            "path": "src/coderag/cli.py",
+            "text": "@cli.command(\"context-pack\")"
+          }
+        ]
+      }
+    },
+    {
+      "schema_version": "evalfly.case.v1",
+      "case_id": "m4-targeted-tests-exist",
+      "title": "Milestone 4 targeted tests exist",
+      "suite": "smoke",
+      "risk_tier": "critical",
+      "task_type": "test_coverage",
+      "source": {
+        "kind": "acceptance_criteria",
+        "criteria": "M4-AC1 M4-AC2 M4-AC3"
+      },
+      "privacy": {
+        "classification": "public",
+        "sanitized": true
+      },
+      "expected": {
+        "success_criteria": [
+          "Targeted hybrid retrieval and context pack tests are committed."
+        ]
+      },
+      "judge": {
+        "type": "deterministic",
+        "assertions": [
+          {
+            "type": "file_exists",
+            "path": "tests/test_m4_hybrid_retrieval.py"
+          }
+        ]
+      }
     }
   ]
 }

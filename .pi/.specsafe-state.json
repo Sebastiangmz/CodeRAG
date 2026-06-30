@@ -120,6 +120,26 @@
           "turns": 0
         }
       }
+    },
+    {
+      "sliceId": "CRAG-20260630-M4-HYBRID-CONTEXT-PACKS",
+      "workspaceId": "CodeRAG",
+      "sessionId": "omp-session",
+      "beganAt": "2026-06-30T20:39:16.458Z",
+      "endedAt": "2026-06-30T20:58:56.662Z",
+      "outcome": "PASS",
+      "costSummary": {
+        "externalMemoryCalls": 0,
+        "externalMemoryCost": 0,
+        "subagentTokens": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "cost": 0,
+          "turns": 0
+        }
+      }
     }
   ]
 }

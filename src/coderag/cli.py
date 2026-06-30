@@ -6,10 +6,8 @@ import platform
 import shutil
 import sys
 from pathlib import Path
-from typing import Optional
 
 import click
-
 
 # Config directory and file
 CONFIG_DIR = Path.home() / ".config" / "coderag"
@@ -32,7 +30,7 @@ def save_config(config: dict) -> None:
     CONFIG_FILE.write_text(json.dumps(config, indent=2))
 
 
-def get_claude_config_path() -> Optional[Path]:
+def get_claude_config_path() -> Path | None:
     """Get Claude Desktop config path based on OS."""
     system = platform.system()
 
@@ -62,7 +60,7 @@ def cli():
 @click.option("--provider", type=click.Choice(["groq", "openai", "anthropic", "openrouter", "together", "local"]),
               default=None, help="LLM provider to use")
 @click.option("--api-key", default=None, help="API key for the provider")
-def setup(provider: Optional[str], api_key: Optional[str]):
+def setup(provider: str | None, api_key: str | None):
     """Interactive setup wizard for CodeRAG.
 
     Configures the LLM provider and API key. Configuration is saved to
@@ -161,8 +159,9 @@ def serve(host: str, port: int, reload: bool):
     _apply_config_to_env()
 
     import uvicorn
-    from coderag.main import create_app
+
     from coderag.config import get_settings
+    from coderag.main import create_app
 
     settings = get_settings()
     app = create_app()
@@ -264,7 +263,7 @@ def mcp_install(dry_run: bool):
     # Show diff
     click.echo("\n📝 Changes to be made:")
     if existing:
-        click.echo(f"   Update: mcpServers.coderag")
+        click.echo("   Update: mcpServers.coderag")
         click.echo(f"   From: {json.dumps(existing)}")
         click.echo(f"   To:   {json.dumps(new_mcp_config)}")
     else:
@@ -303,6 +302,7 @@ def index(url: str, branch: str):
     _apply_config_to_env()
 
     import asyncio
+
     from coderag.mcp.handlers import get_mcp_handlers
 
     click.echo(f"\n📦 Indexing repository: {url}")
@@ -318,7 +318,7 @@ def index(url: str, branch: str):
     result = asyncio.run(run_index())
 
     if result.get("success"):
-        click.echo(f"\n✅ Repository indexed successfully!")
+        click.echo("\n✅ Repository indexed successfully!")
         click.echo(f"   Repo ID: {result['repo_id']}")
         click.echo(f"   Name: {result['name']}")
         click.echo(f"   Files processed: {result['files_processed']}")
@@ -346,6 +346,7 @@ def query(repo_id: str, question: str, top_k: int, output_format: str):
     _apply_config_to_env()
 
     import asyncio
+
     from coderag.mcp.handlers import get_mcp_handlers
 
     handlers = get_mcp_handlers()
@@ -388,6 +389,65 @@ def query(repo_id: str, question: str, top_k: int, output_format: str):
                 click.echo(f"   - {chunk['file']}:{chunk['start_line']}-{chunk['end_line']} (relevance: {chunk['relevance']})")
 
 
+
+@cli.command("context-pack")
+@click.argument("repo_id")
+@click.argument("query_text")
+@click.option("--top-k", default=10, type=int, help="Maximum snippets to include")
+@click.option("--max-tokens", default=4000, type=int, help="Maximum context token estimate")
+@click.option("--max-chunks-per-file", default=3, type=int, help="Maximum snippets per file")
+@click.option("--format", "output_format", type=click.Choice(["markdown", "json"]), default="markdown", help="Output format")
+def context_pack(repo_id: str, query_text: str, top_k: int, max_tokens: int, max_chunks_per_file: int, output_format: str):
+    """Build a retrieval-only context pack for agents.
+
+    REPO_ID: Repository ID (full or first 8 characters)
+    QUERY_TEXT: Retrieval query for the context pack
+    """
+    _apply_config_to_env()
+
+    import asyncio
+
+    from coderag.mcp.handlers import get_mcp_handlers
+
+    handlers = get_mcp_handlers()
+
+    async def run_context_pack():
+        return await handlers.get_context_pack(
+            repo_id=repo_id,
+            query=query_text,
+            top_k=top_k,
+            max_tokens=max_tokens,
+            max_chunks_per_file=max_chunks_per_file,
+        )
+
+    result = asyncio.run(run_context_pack())
+    if result.get("error"):
+        click.echo(f"❌ Error: {result['error']}")
+        sys.exit(1)
+
+    if output_format == "json":
+        click.echo(json.dumps(result, indent=2))
+        return
+
+    click.echo(f"# Context Pack: {result.get('repo_id', repo_id)}")
+    click.echo("")
+    click.echo(f"Query: {result.get('query', query_text)}")
+    click.echo(f"Token estimate: {result.get('token_estimate', 0)}")
+    capabilities = result.get("capabilities", {})
+    click.echo(f"Generation required: {capabilities.get('generation_required', False)}")
+    click.echo("")
+    click.echo("## Snippets")
+    for index, snippet in enumerate(result.get("snippets", []), 1):
+        click.echo("")
+        click.echo(f"### {index}. {snippet.get('citation', 'unknown')}")
+        sources = ", ".join(snippet.get("retrieval_sources", [])) or "none"
+        click.echo(f"Sources: {sources}")
+        if snippet.get("ranking_reason"):
+            click.echo(f"Ranking: {snippet['ranking_reason']}")
+        click.echo("```")
+        click.echo(snippet.get("content", ""))
+        click.echo("```")
+
 @cli.command("repos")
 @click.option("--format", "output_format", type=click.Choice(["text", "json"]), default="text", help="Output format")
 def repos(output_format: str):
@@ -396,6 +456,7 @@ def repos(output_format: str):
     _apply_config_to_env()
 
     import asyncio
+
     from coderag.mcp.handlers import get_mcp_handlers
 
     handlers = get_mcp_handlers()
@@ -438,6 +499,7 @@ def update(repo_id: str):
     _apply_config_to_env()
 
     import asyncio
+
     from coderag.mcp.handlers import get_mcp_handlers
 
     click.echo(f"\n🔄 Updating repository: {repo_id}\n")
@@ -484,6 +546,7 @@ def delete(repo_id: str, force: bool):
     _apply_config_to_env()
 
     import asyncio
+
     from coderag.mcp.handlers import get_mcp_handlers
 
     handlers = get_mcp_handlers()
@@ -537,6 +600,7 @@ def clean(force: bool):
     _apply_config_to_env()
 
     import asyncio
+
     from coderag.mcp.handlers import get_mcp_handlers
 
     handlers = get_mcp_handlers()
@@ -560,16 +624,17 @@ def clean(force: bool):
         status_icon = "❌" if repo["status"] == "error" else "⏳"
         click.echo(f"   {status_icon} {repo['id'][:8]}  {repo['name']} ({repo['status']})")
 
-    if not force:
-        if not click.confirm(f"\nDelete these {len(to_clean)} repositories?"):
-            click.echo("Cancelled.")
-            return
+    if not force and not click.confirm(f"\nDelete these {len(to_clean)} repositories?"):
+        click.echo("Cancelled.")
+        return
 
     # Delete each repo
     deleted = 0
     for repo in to_clean:
-        async def run_delete():
-            return await handlers.delete_repository(repo_id=repo["id"])
+        repo_id = repo["id"]
+
+        async def run_delete(repo_id: str = repo_id):
+            return await handlers.delete_repository(repo_id=repo_id)
 
         try:
             result = asyncio.run(run_delete())
@@ -608,7 +673,7 @@ def doctor():
         if config.get("llm_provider"):
             click.echo(f"   Provider: {config['llm_provider']}")
     else:
-        click.echo(f"⚠️  No config file. Run 'coderag setup' to configure.")
+        click.echo("⚠️  No config file. Run 'coderag setup' to configure.")
 
     # Check API key
     api_key = config.get("llm_api_key") or os.environ.get("MODEL_LLM_API_KEY")

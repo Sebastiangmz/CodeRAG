@@ -1,7 +1,6 @@
 """ChromaDB vector store operations."""
 
 from pathlib import Path
-from typing import Optional
 
 import chromadb
 from chromadb.config import Settings
@@ -18,14 +17,14 @@ class VectorStore:
 
     def __init__(
         self,
-        persist_directory: Optional[Path] = None,
-        collection_name: Optional[str] = None,
+        persist_directory: Path | None = None,
+        collection_name: str | None = None,
     ) -> None:
         settings = get_settings()
         self.persist_directory = persist_directory or settings.vectorstore.persist_directory
         self.collection_name = collection_name or settings.vectorstore.collection_name
-        self._client: Optional[chromadb.PersistentClient] = None
-        self._collection: Optional[chromadb.Collection] = None
+        self._client: chromadb.PersistentClient | None = None
+        self._collection: chromadb.Collection | None = None
 
     @property
     def client(self) -> chromadb.PersistentClient:
@@ -111,6 +110,22 @@ class VectorStore:
                     chunks_with_scores.append((chunk, similarity))
 
         return chunks_with_scores
+
+    def get_repo_chunks(self, repo_id: str) -> list[Chunk]:
+        """Return all stored chunks for a repository without similarity ranking."""
+        results = self.collection.get(
+            where={"repo_id": repo_id},
+            include=["documents", "metadatas"],
+        )
+
+        chunks: list[Chunk] = []
+        if results["ids"]:
+            for index, chunk_id in enumerate(results["ids"]):
+                metadata = results["metadatas"][index]
+                metadata["id"] = chunk_id
+                metadata["content"] = results["documents"][index]
+                chunks.append(Chunk.from_dict(metadata))
+        return chunks
 
     def delete_repo_chunks(self, repo_id: str) -> int:
         # Get all chunks for this repo

@@ -7,6 +7,9 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException
 from coderag.api.schemas import (
     CitationResponse,
     CitationVerificationResponse,
+    ContextPackRequest,
+    ContextPackResponse,
+    ContextSnippetResponse,
     IndexRepositoryRequest,
     IndexRepositoryResponse,
     ListRepositoriesResponse,
@@ -154,11 +157,56 @@ async def query_repository(request: QueryRequest) -> QueryResponse:
                 chunk_type=c.chunk_type,
                 name=c.name,
                 content=c.content,
+                score_breakdown=c.score_breakdown,
+                retrieval_sources=c.retrieval_sources,
+                token_estimate=c.token_estimate,
+                ranking_reason=c.ranking_reason,
             )
             for c in response.retrieved_chunks
         ],
         grounded=response.grounded,
         query_id=response.query_id,
+    )
+
+
+@router.post("/context-pack", response_model=ContextPackResponse)
+async def context_pack(request: ContextPackRequest) -> ContextPackResponse:
+    """Build a hybrid retrieval context pack without LLM generation."""
+    repo = get_repo_or_404(request.repo_id)
+    try:
+        pack = retrieval_service.get_context_pack(
+            repo.id,
+            request.query,
+            top_k=request.top_k,
+            max_tokens=request.max_tokens,
+            max_chunks_per_file=request.max_chunks_per_file,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return ContextPackResponse(
+        repo_id=pack.repo_id,
+        query=pack.query,
+        snippets=[
+            ContextSnippetResponse(
+                chunk_id=snippet.chunk_id,
+                file_path=snippet.file_path,
+                start_line=snippet.start_line,
+                end_line=snippet.end_line,
+                citation=snippet.citation,
+                chunk_type=snippet.chunk_type,
+                name=snippet.name,
+                content=snippet.content,
+                relevance_score=snippet.relevance_score,
+                score_breakdown=snippet.score_breakdown,
+                retrieval_sources=snippet.retrieval_sources,
+                token_estimate=snippet.token_estimate,
+                ranking_reason=snippet.ranking_reason,
+            )
+            for snippet in pack.snippets
+        ],
+        token_estimate=pack.token_estimate,
+        budget=pack.budget,
+        capabilities=pack.capabilities,
     )
 
 

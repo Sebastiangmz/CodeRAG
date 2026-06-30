@@ -63,6 +63,10 @@ class RetrievedChunkResponse(BaseModel):
     chunk_type: str
     name: str | None = None
     content: str
+    score_breakdown: dict[str, float] = Field(default_factory=dict)
+    retrieval_sources: list[str] = Field(default_factory=list)
+    token_estimate: int = 0
+    ranking_reason: str | None = None
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -78,6 +82,45 @@ class QueryResponse(BaseModel):
     retrieved_chunks: list[RetrievedChunkResponse] = Field(..., description="Evidence chunks")
     grounded: bool = Field(..., description="Whether every parsed citation is verified against retrieved evidence")
     query_id: str = Field(..., description="Query ID")
+
+
+class ContextPackRequest(BaseModel):
+    """Request to build a retrieval-only context pack."""
+
+    query: str = Field(..., description="Search query for the context pack")
+    repo_id: str = Field(..., description="Repository ID to search")
+    top_k: int = Field(10, ge=1, le=20, description="Maximum snippets to include")
+    max_tokens: int = Field(4000, ge=1, description="Maximum context token estimate")
+    max_chunks_per_file: int = Field(3, ge=1, description="Maximum snippets per file")
+
+
+class ContextSnippetResponse(BaseModel):
+    """A retrieval-only context snippet."""
+
+    chunk_id: str
+    file_path: str
+    start_line: int
+    end_line: int
+    citation: str
+    chunk_type: str
+    name: str | None = None
+    content: str
+    relevance_score: float = 0.0
+    score_breakdown: dict[str, float] = Field(default_factory=dict)
+    retrieval_sources: list[str] = Field(default_factory=list)
+    token_estimate: int = 0
+    ranking_reason: str | None = None
+
+
+class ContextPackResponse(BaseModel):
+    """Retrieval-only context pack response."""
+
+    repo_id: str
+    query: str
+    snippets: list[ContextSnippetResponse]
+    token_estimate: int
+    budget: dict[str, int]
+    capabilities: dict[str, object]
 
 class RepositoryInfo(BaseModel):
     """Repository information."""

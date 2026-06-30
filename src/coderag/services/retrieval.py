@@ -8,9 +8,11 @@ from typing import Any, cast
 from coderag.config import get_settings
 from coderag.logging import get_logger
 from coderag.models.chunk import Chunk
+from coderag.models.context import ContextPack, ContextSnippet
 from coderag.models.query import Query
 from coderag.models.repository import Repository, RepositoryStatus
-from coderag.models.response import Response
+from coderag.models.response import Response, RetrievedChunk
+from coderag.retrieval.hybrid import HybridRetriever, RetrievalBudget
 from coderag.services.providers import ProviderConfigService
 from coderag.services.registry import RepositoryRegistry
 
@@ -105,6 +107,64 @@ class RetrievalService:
 
         return cast(list[tuple[Chunk, float]], results[:top_k])
 
+    def search_hybrid(
+        self,
+        repo_id: str,
+        query: str,
+        top_k: int = 10,
+        max_tokens: int = 4000,
+        max_chunks_per_file: int = 3,
+    ) -> list[RetrievedChunk]:
+        """Hybrid code search without LLM generation."""
+        repo, error = self.require_ready_repository(repo_id)
+        if error is not None:
+            raise ValueError(error)
+        assert repo is not None
+
+        top_k = self._clamp_top_k(top_k)
+        budget = RetrievalBudget(
+            max_chunks=top_k,
+            max_tokens=max(int(max_tokens), 1),
+            max_chunks_per_file=max(int(max_chunks_per_file), 1),
+        )
+        return self._get_hybrid_retriever().retrieve(query=query, repo_id=repo.id, top_k=top_k, budget=budget)
+
+    def get_context_pack(
+        self,
+        repo_id: str,
+        query: str,
+        top_k: int = 10,
+        max_tokens: int = 4000,
+        max_chunks_per_file: int = 3,
+    ) -> ContextPack:
+        """Build a retrieval-only context pack for agents and API clients."""
+        chunks = self.search_hybrid(
+            repo_id=repo_id,
+            query=query,
+            top_k=top_k,
+            max_tokens=max_tokens,
+            max_chunks_per_file=max_chunks_per_file,
+        )
+        budget = {
+            "max_chunks": self._clamp_top_k(top_k),
+            "max_tokens": max(int(max_tokens), 1),
+            "max_chunks_per_file": max(int(max_chunks_per_file), 1),
+        }
+        snippets = [ContextSnippet.from_retrieved_chunk(chunk) for chunk in chunks]
+        return ContextPack(
+            repo_id=repo_id,
+            query=query,
+            snippets=snippets,
+            token_estimate=sum(snippet.token_estimate for snippet in snippets),
+            budget=budget,
+            capabilities={
+                "generation_required": False,
+                "retrieval": "hybrid",
+                "semantic": True,
+                "lexical": True,
+            },
+        )
+
     def _clamp_top_k(self, top_k: int) -> int:
         return min(max(int(top_k), 1), self.retrieval_settings.max_top_k)
 
@@ -131,3 +191,10 @@ class RetrievalService:
         if self._generator is None:
             self._generator = self.generator_factory()
         return self._generator
+
+    def _get_hybrid_retriever(self) -> HybridRetriever:
+        return HybridRetriever(
+            vectorstore=self._get_vectorstore(),
+            embedder=self._get_embedder(),
+            similarity_threshold=self.retrieval_settings.similarity_threshold,
+        )

@@ -36,6 +36,8 @@ class TestToolRegistration:
             assert hasattr(tools, "delete_repository")
             assert hasattr(tools, "update_repository")
             assert hasattr(tools, "search_code")
+            assert hasattr(tools, "search_hybrid")
+            assert hasattr(tools, "get_context_pack")
 
 
 class TestToolDelegation:
@@ -176,3 +178,57 @@ class TestToolDelegation:
                 chunk_type="function",
             )
             assert result["count"] == 0
+
+    @pytest.mark.asyncio
+    async def test_search_hybrid_delegates_to_handler(self):
+        """Test that search_hybrid tool delegates to handler."""
+        with patch("coderag.mcp.tools.get_mcp_handlers") as mock_get_handlers:
+            mock_handler = MagicMock()
+            mock_handler.search_hybrid = AsyncMock(return_value={"results": [], "count": 0})
+            mock_get_handlers.return_value = mock_handler
+
+            from coderag.mcp.tools import search_hybrid
+
+            result = await search_hybrid(
+                repo_id="test-id",
+                query="function",
+                top_k=10,
+                max_tokens=1000,
+                max_chunks_per_file=2,
+            )
+
+            mock_handler.search_hybrid.assert_called_once_with(
+                repo_id="test-id",
+                query="function",
+                top_k=10,
+                max_tokens=1000,
+                max_chunks_per_file=2,
+            )
+            assert result["count"] == 0
+
+    @pytest.mark.asyncio
+    async def test_get_context_pack_delegates_to_handler(self):
+        """Test that get_context_pack tool delegates to handler."""
+        with patch("coderag.mcp.tools.get_mcp_handlers") as mock_get_handlers:
+            mock_handler = MagicMock()
+            mock_handler.get_context_pack = AsyncMock(return_value={"snippets": [], "token_estimate": 0})
+            mock_get_handlers.return_value = mock_handler
+
+            from coderag.mcp.tools import get_context_pack
+
+            result = await get_context_pack(
+                repo_id="test-id",
+                query="function",
+                top_k=10,
+                max_tokens=1000,
+                max_chunks_per_file=2,
+            )
+
+            mock_handler.get_context_pack.assert_called_once_with(
+                repo_id="test-id",
+                query="function",
+                top_k=10,
+                max_tokens=1000,
+                max_chunks_per_file=2,
+            )
+            assert result["token_estimate"] == 0

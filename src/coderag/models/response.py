@@ -52,6 +52,10 @@ class RetrievedChunk:
     relevance_score: float
     chunk_type: str
     name: str | None = None
+    score_breakdown: dict[str, float] = field(default_factory=dict)
+    retrieval_sources: list[str] = field(default_factory=list)
+    token_estimate: int = 0
+    ranking_reason: str | None = None
 
     @property
     def citation(self) -> str:

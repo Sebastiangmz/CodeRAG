@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import pytest
 
 from coderag.api import routes
-from coderag.api.schemas import IndexRepositoryRequest, QueryRequest
+from coderag.api.schemas import ContextPackRequest, IndexRepositoryRequest, QueryRequest
 from coderag.models.repository import Repository, RepositoryStatus
 from coderag.services.indexing import RepositoryDeleteResult
 from coderag.services.retrieval import QueryServiceResult
@@ -111,6 +111,32 @@ class FakeRetrievalService:
             return QueryServiceResult(repo=self.repo, error=f"Repository not ready: status is {self.repo.status.value}")
         return QueryServiceResult(repo=self.repo, response=FakeGeneratedResponse())
 
+    def get_context_pack(self, repo_id: str, query: str, top_k: int = 10, max_tokens: int = 4000, max_chunks_per_file: int = 3):
+        from coderag.models.context import ContextPack, ContextSnippet
+
+        self.calls.append((repo_id, query, top_k, max_tokens, max_chunks_per_file))
+        return ContextPack(
+            repo_id=repo_id,
+            query=query,
+            snippets=[
+                ContextSnippet(
+                    chunk_id="chunk-1",
+                    file_path="src/app.py",
+                    start_line=1,
+                    end_line=2,
+                    chunk_type="function",
+                    name="app",
+                    content="def app(): pass",
+                    retrieval_sources=["lexical"],
+                    token_estimate=3,
+                    score_breakdown={"lexical": 1.0, "combined": 0.55},
+                )
+            ],
+            token_estimate=3,
+            budget={"max_chunks": top_k, "max_tokens": max_tokens, "max_chunks_per_file": max_chunks_per_file},
+            capabilities={"generation_required": False, "retrieval": "hybrid"},
+        )
+
 
 @pytest.mark.asyncio
 async def test_index_repository_route_creates_record_through_indexing_service(monkeypatch):
@@ -145,6 +171,25 @@ async def test_query_route_uses_retrieval_service_and_preserves_response(monkeyp
     assert response.citation_verifications[0].file_path == "src/app.py"
     assert response.citation_verifications[0].verified is True
     assert response.citation_verifications[0].reason == "verified"
+
+
+@pytest.mark.asyncio
+async def test_context_pack_route_uses_retrieval_service_without_generation(monkeypatch):
+    repo = Repository(id="repo-ready", url="https://github.com/acme/demo", status=RepositoryStatus.READY)
+    retrieval = FakeRetrievalService(repo)
+    monkeypatch.setattr(routes, "registry", FakeRegistry(repo))
+    monkeypatch.setattr(routes, "retrieval_service", retrieval)
+
+    response = await routes.context_pack(
+        ContextPackRequest(repo_id="repo-ready", query="app function", top_k=3, max_tokens=1000)
+    )
+
+    assert response.repo_id == "repo-ready"
+    assert response.query == "app function"
+    assert response.capabilities["generation_required"] is False
+    assert response.snippets[0].citation == "[src/app.py:1-2]"
+    assert response.snippets[0].score_breakdown["lexical"] == 1.0
+    assert retrieval.calls[-1] == ("repo-ready", "app function", 3, 1000, 3)
 
 
 @pytest.mark.asyncio

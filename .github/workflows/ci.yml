@@ -42,3 +42,11 @@ jobs:
 
       - name: Run committed EvalFly smoke baseline
         run: python scripts/evalfly_smoke.py --suite smoke
+
+      - name: Check Milestone 7 release artifacts
+        run: |
+          test -f docs/superpowers/plans/2026-06-30-m7-production-rc-contract.md
+          test -f docs/superpowers/plans/2026-06-30-m7-release-run-record.md
+          test -f evals/runs/20260630-m7-production-rc.json
+          test -f evals/reports/20260630-m7-production-rc.md
+          python -m json.tool evals/runs/20260630-m7-production-rc.json >/dev/null

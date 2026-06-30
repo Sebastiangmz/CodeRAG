@@ -179,6 +179,26 @@
           "turns": 0
         }
       }
+    },
+    {
+      "sliceId": "CRAG-20260630-M7-PRODUCTION-RC",
+      "workspaceId": "CodeRAG",
+      "sessionId": "omp-session",
+      "beganAt": "2026-06-30T21:42:53.203Z",
+      "endedAt": "2026-06-30T22:01:40.052Z",
+      "outcome": "PASS",
+      "costSummary": {
+        "externalMemoryCalls": 0,
+        "externalMemoryCost": 0,
+        "subagentTokens": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "cost": 0,
+          "turns": 0
+        }
+      }
     }
   ]
 }

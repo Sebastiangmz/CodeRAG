@@ -323,6 +323,8 @@ Current release-candidate work is evidence-gated. The supported default is local
 - Unsupported graph languages degrade explicitly to text/chunk retrieval; they do not report fake graph confidence.
 - CodeRAG verifies citations against retrieved chunks, but it does not prove repository correctness, execute arbitrary project tests, or make autonomous code changes.
 
+Release-candidate evidence is committed in `docs/superpowers/plans/2026-06-30-m7-release-run-record.md`, `evals/runs/20260630-m7-production-rc.json`, and `evals/reports/20260630-m7-production-rc.md`.
+
 ## 🏗️ Architecture
 
 ```

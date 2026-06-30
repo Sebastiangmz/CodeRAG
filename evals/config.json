@@ -866,6 +866,230 @@
           }
         ]
       }
+    },
+    {
+      "schema_version": "evalfly.case.v1",
+      "case_id": "m7-production-rc-contract-exists",
+      "title": "Milestone 7 release candidate contract exists",
+      "suite": "smoke",
+      "risk_tier": "critical",
+      "task_type": "delivery_governance",
+      "source": {
+        "kind": "acceptance_criteria",
+        "criteria": "M7-AC1 M7-AC2 M7-AC3 M7-AC4"
+      },
+      "privacy": {
+        "classification": "public",
+        "sanitized": true
+      },
+      "expected": {
+        "success_criteria": [
+          "The Milestone 7 release-candidate contract is committed."
+        ]
+      },
+      "judge": {
+        "type": "deterministic",
+        "assertions": [
+          {
+            "type": "file_exists",
+            "path": "docs/superpowers/plans/2026-06-30-m7-production-rc-contract.md"
+          }
+        ]
+      }
+    },
+    {
+      "schema_version": "evalfly.case.v1",
+      "case_id": "m7-release-run-record-exists",
+      "title": "Release-candidate run record exists",
+      "suite": "smoke",
+      "risk_tier": "critical",
+      "task_type": "release_evidence",
+      "source": {
+        "kind": "acceptance_criteria",
+        "criteria": "M7-AC1 M7-AC2 M7-AC3"
+      },
+      "privacy": {
+        "classification": "public",
+        "sanitized": true
+      },
+      "expected": {
+        "success_criteria": [
+          "The release run record documents clean install, local gates, covered surfaces, and exclusions."
+        ]
+      },
+      "judge": {
+        "type": "deterministic",
+        "assertions": [
+          {
+            "type": "file_contains",
+            "path": "docs/superpowers/plans/2026-06-30-m7-release-run-record.md",
+            "text": "Clean install"
+          },
+          {
+            "type": "file_contains",
+            "path": "docs/superpowers/plans/2026-06-30-m7-release-run-record.md",
+            "text": "Explicit exclusions"
+          }
+        ]
+      }
+    },
+    {
+      "schema_version": "evalfly.case.v1",
+      "case_id": "m7-evalfly-artifacts-exist",
+      "title": "Release-candidate EvalFly artifacts exist",
+      "suite": "smoke",
+      "risk_tier": "critical",
+      "task_type": "release_evidence",
+      "source": {
+        "kind": "acceptance_criteria",
+        "criteria": "M7-AC4 M7-AC6"
+      },
+      "privacy": {
+        "classification": "public",
+        "sanitized": true
+      },
+      "expected": {
+        "success_criteria": [
+          "EvalFly run and report artifacts are committed for the release candidate."
+        ]
+      },
+      "judge": {
+        "type": "deterministic",
+        "assertions": [
+          {
+            "type": "file_exists",
+            "path": "evals/runs/20260630-m7-production-rc.json"
+          },
+          {
+            "type": "file_exists",
+            "path": "evals/reports/20260630-m7-production-rc.md"
+          }
+        ]
+      }
+    },
+    {
+      "schema_version": "evalfly.case.v1",
+      "case_id": "m7-evalfly-hybrid-behavior-covered",
+      "title": "Hybrid retrieval behavior coverage is present",
+      "suite": "smoke",
+      "risk_tier": "critical",
+      "task_type": "behavioral_coverage_pointer",
+      "source": {
+        "kind": "acceptance_criteria",
+        "criteria": "M7-AC2 M7-AC3 M7-AC4"
+      },
+      "privacy": {
+        "classification": "public",
+        "sanitized": true
+      },
+      "expected": {
+        "success_criteria": [
+          "The committed test suite contains a deterministic behavior-level coverage pointer for this release-candidate surface."
+        ]
+      },
+      "judge": {
+        "type": "deterministic",
+        "assertions": [
+          {
+            "type": "file_contains",
+            "path": "tests/test_m4_hybrid_retrieval.py",
+            "text": "test_hybrid_retrieval_surfaces_lexical_exact_match_ahead_of_unrelated_vector_hit"
+          }
+        ]
+      }
+    },
+    {
+      "schema_version": "evalfly.case.v1",
+      "case_id": "m7-evalfly-citation-behavior-covered",
+      "title": "Citation verification behavior coverage is present",
+      "suite": "smoke",
+      "risk_tier": "critical",
+      "task_type": "behavioral_coverage_pointer",
+      "source": {
+        "kind": "acceptance_criteria",
+        "criteria": "M7-AC2 M7-AC3 M7-AC4"
+      },
+      "privacy": {
+        "classification": "public",
+        "sanitized": true
+      },
+      "expected": {
+        "success_criteria": [
+          "The committed test suite contains a deterministic behavior-level coverage pointer for this release-candidate surface."
+        ]
+      },
+      "judge": {
+        "type": "deterministic",
+        "assertions": [
+          {
+            "type": "file_contains",
+            "path": "tests/test_m3_citations.py",
+            "text": "test_response_generator_grounds_only_when_all_citations_verify"
+          }
+        ]
+      }
+    },
+    {
+      "schema_version": "evalfly.case.v1",
+      "case_id": "m7-evalfly-graph-behavior-covered",
+      "title": "Code graph behavior coverage is present",
+      "suite": "smoke",
+      "risk_tier": "critical",
+      "task_type": "behavioral_coverage_pointer",
+      "source": {
+        "kind": "acceptance_criteria",
+        "criteria": "M7-AC2 M7-AC3 M7-AC4"
+      },
+      "privacy": {
+        "classification": "public",
+        "sanitized": true
+      },
+      "expected": {
+        "success_criteria": [
+          "The committed test suite contains a deterministic behavior-level coverage pointer for this release-candidate surface."
+        ]
+      },
+      "judge": {
+        "type": "deterministic",
+        "assertions": [
+          {
+            "type": "file_contains",
+            "path": "tests/test_m5_code_graph.py",
+            "text": "test_graph_service_finds_symbols_references_and_blast_radius"
+          }
+        ]
+      }
+    },
+    {
+      "schema_version": "evalfly.case.v1",
+      "case_id": "m7-evalfly-interface-behavior-covered",
+      "title": "Interface behavior coverage is present",
+      "suite": "smoke",
+      "risk_tier": "critical",
+      "task_type": "behavioral_coverage_pointer",
+      "source": {
+        "kind": "acceptance_criteria",
+        "criteria": "M7-AC2 M7-AC3 M7-AC4"
+      },
+      "privacy": {
+        "classification": "public",
+        "sanitized": true
+      },
+      "expected": {
+        "success_criteria": [
+          "The committed test suite contains a deterministic behavior-level coverage pointer for this release-candidate surface."
+        ]
+      },
+      "judge": {
+        "type": "deterministic",
+        "assertions": [
+          {
+            "type": "file_contains",
+            "path": "tests/test_m6_interfaces_docs.py",
+            "text": "test_cli_hybrid_search_outputs_structured_json"
+          }
+        ]
+      }
     }
   ]
 }

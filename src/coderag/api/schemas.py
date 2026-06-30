@@ -123,6 +123,41 @@ class ContextPackResponse(BaseModel):
     capabilities: dict[str, object]
 
 
+
+class HybridSearchRequest(BaseModel):
+    """Request to run hybrid retrieval without generation."""
+
+    repo_id: str = Field(..., description="Repository ID to search")
+    query: str = Field(..., description="Search query")
+    top_k: int = Field(10, ge=1, le=20, description="Maximum results to include")
+    max_tokens: int = Field(4000, ge=1, description="Maximum token estimate")
+    max_chunks_per_file: int = Field(3, ge=1, description="Maximum results per file")
+
+
+class HybridSearchResultResponse(BaseModel):
+    """A hybrid retrieval result."""
+
+    chunk_id: str
+    file_path: str
+    start_line: int
+    end_line: int
+    citation: str
+    chunk_type: str
+    name: str | None = None
+    content: str
+    relevance_score: float = 0.0
+    score_breakdown: dict[str, float] = Field(default_factory=dict)
+    retrieval_sources: list[str] = Field(default_factory=list)
+    token_estimate: int = 0
+    ranking_reason: str | None = None
+
+
+class HybridSearchResponse(BaseModel):
+    """Hybrid retrieval response."""
+
+    results: list[HybridSearchResultResponse]
+    count: int
+
 class GraphQueryRequest(BaseModel):
     """Request for graph symbol queries."""
 

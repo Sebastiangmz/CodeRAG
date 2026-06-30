@@ -42,6 +42,7 @@ def _retrieved_chunk_dict(chunk: Any) -> dict[str, Any]:
         "file_path": _read_field(chunk, "file_path"),
         "start_line": _read_field(chunk, "start_line"),
         "end_line": _read_field(chunk, "end_line"),
+        "citation": f"[{_read_field(chunk, 'file_path')}:{_read_field(chunk, 'start_line')}-{_read_field(chunk, 'end_line')}]",
         "chunk_type": _read_field(chunk, "chunk_type"),
         "name": _read_field(chunk, "name"),
         "content": _read_field(chunk, "content"),

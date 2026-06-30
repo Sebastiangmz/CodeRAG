@@ -16,6 +16,9 @@ from coderag.api.schemas import (
     GraphQueryRequest,
     GraphReferenceResponse,
     GraphSymbolResponse,
+    HybridSearchRequest,
+    HybridSearchResponse,
+    HybridSearchResultResponse,
     IndexRepositoryRequest,
     IndexRepositoryResponse,
     ListRepositoriesResponse,
@@ -215,6 +218,43 @@ async def context_pack(request: ContextPackRequest) -> ContextPackResponse:
         token_estimate=pack.token_estimate,
         budget=pack.budget,
         capabilities=pack.capabilities,
+    )
+
+
+@router.post("/search-hybrid", response_model=HybridSearchResponse)
+async def search_hybrid(request: HybridSearchRequest) -> HybridSearchResponse:
+    """Run hybrid retrieval without LLM generation."""
+    repo = get_repo_or_404(request.repo_id)
+    try:
+        results = retrieval_service.search_hybrid(
+            repo.id,
+            request.query,
+            top_k=request.top_k,
+            max_tokens=request.max_tokens,
+            max_chunks_per_file=request.max_chunks_per_file,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return HybridSearchResponse(
+        results=[
+            HybridSearchResultResponse(
+                chunk_id=chunk.chunk_id,
+                file_path=chunk.file_path,
+                start_line=chunk.start_line,
+                end_line=chunk.end_line,
+                citation=chunk.citation,
+                chunk_type=chunk.chunk_type,
+                name=chunk.name,
+                content=chunk.content,
+                relevance_score=chunk.relevance_score,
+                score_breakdown=chunk.score_breakdown,
+                retrieval_sources=chunk.retrieval_sources,
+                token_estimate=chunk.token_estimate,
+                ranking_reason=chunk.ranking_reason,
+            )
+            for chunk in results
+        ],
+        count=len(results),
     )
 
 

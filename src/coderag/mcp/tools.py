@@ -198,3 +198,48 @@ async def get_context_pack(
         max_tokens=max_tokens,
         max_chunks_per_file=max_chunks_per_file,
     )
+
+
+@mcp.tool()
+async def find_symbol(repo_id: str, symbol_name: str) -> dict:
+    """Find indexed code graph symbols by exact name.
+
+    Args:
+        repo_id: Repository ID (full or first 8 characters)
+        symbol_name: Symbol name to find
+
+    Returns:
+        dict with symbols array and count
+    """
+    handlers = get_mcp_handlers()
+    return handlers.find_symbol(repo_id=repo_id, symbol_name=symbol_name)
+
+
+@mcp.tool()
+async def find_references(repo_id: str, symbol_name: str) -> dict:
+    """Find indexed code graph references to a symbol.
+
+    Args:
+        repo_id: Repository ID (full or first 8 characters)
+        symbol_name: Symbol name to find references for
+
+    Returns:
+        dict with references array and count
+    """
+    handlers = get_mcp_handlers()
+    return handlers.find_references(repo_id=repo_id, symbol_name=symbol_name)
+
+
+@mcp.tool()
+async def get_blast_radius(repo_id: str, symbol_name: str) -> dict:
+    """Return graph-backed blast radius evidence for a symbol.
+
+    Args:
+        repo_id: Repository ID (full or first 8 characters)
+        symbol_name: Symbol name to inspect
+
+    Returns:
+        dict with impacted files, symbols, tests, graph edges, and reasons
+    """
+    handlers = get_mcp_handlers()
+    return handlers.get_blast_radius(repo_id=repo_id, symbol_name=symbol_name)

@@ -122,6 +122,53 @@ class ContextPackResponse(BaseModel):
     budget: dict[str, int]
     capabilities: dict[str, object]
 
+
+class GraphQueryRequest(BaseModel):
+    """Request for graph symbol queries."""
+
+    repo_id: str = Field(..., description="Repository ID to query")
+    symbol: str = Field(..., description="Symbol name")
+
+
+class GraphSymbolResponse(BaseModel):
+    repo_id: str
+    file_path: str
+    name: str
+    kind: str
+    language: str | None = None
+    start_line: int
+    end_line: int
+    container: str | None = None
+
+
+class GraphReferenceResponse(BaseModel):
+    repo_id: str
+    file_path: str
+    symbol_name: str
+    reference_kind: str
+    start_line: int
+    end_line: int
+    source_name: str | None = None
+
+
+class FindSymbolResponse(BaseModel):
+    symbols: list[GraphSymbolResponse]
+
+
+class FindReferencesResponse(BaseModel):
+    references: list[GraphReferenceResponse]
+
+
+class BlastRadiusResponse(BaseModel):
+    repo_id: str
+    symbol: str
+    impacted_files: list[str]
+    impacted_symbols: list[str]
+    associated_tests: list[str]
+    edges: list[dict[str, object]]
+    reasons: list[str]
+    capabilities: dict[str, object]
+
 class RepositoryInfo(BaseModel):
     """Repository information."""
 

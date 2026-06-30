@@ -1,9 +1,10 @@
 """MCP handlers for CodeRAG."""
 
-from typing import Any
+from typing import Any, cast
 
 from coderag.logging import get_logger
 from coderag.models.repository import Repository
+from coderag.services.graph import CodeGraphService
 from coderag.services.indexing import IndexingOptions, IndexingService
 from coderag.services.registry import RepositoryRegistry
 from coderag.services.retrieval import RetrievalService
@@ -51,6 +52,14 @@ def _retrieved_chunk_dict(chunk: Any) -> dict[str, Any]:
         "ranking_reason": _read_field(chunk, "ranking_reason"),
     }
 
+def _model_dict(item: Any) -> dict[str, Any]:
+    to_dict = getattr(item, "to_dict", None)
+    if callable(to_dict):
+        return cast("dict[str, Any]", to_dict())
+    if isinstance(item, dict):
+        return cast("dict[str, Any]", item)
+    return dict(getattr(item, "__dict__", {}))
+
 
 class MCPHandlers:
     """Handlers for MCP tools backed by shared application services."""
@@ -60,10 +69,12 @@ class MCPHandlers:
         registry: RepositoryRegistry | None = None,
         indexing_service: IndexingService | None = None,
         retrieval_service: RetrievalService | None = None,
+        graph_service: CodeGraphService | None = None,
     ) -> None:
         self.registry = registry or RepositoryRegistry()
         self.indexing_service = indexing_service or IndexingService(registry=self.registry)
         self.retrieval_service = retrieval_service or RetrievalService(registry=self.registry)
+        self.graph_service = graph_service or CodeGraphService(registry=self.registry)
 
     @property
     def repositories(self) -> dict[str, Repository]:
@@ -291,6 +302,32 @@ class MCPHandlers:
         except Exception as exc:
             logger.error("MCP: Context pack failed", error=str(exc))
             return {"snippets": [], "error": str(exc)}
+
+    def find_symbol(self, repo_id: str, symbol_name: str) -> dict[str, Any]:
+        """Find symbols by name using the code graph."""
+        try:
+            symbols = self.graph_service.find_symbol(repo_id, symbol_name)
+            return {"symbols": [_model_dict(symbol) for symbol in symbols], "count": len(symbols)}
+        except Exception as exc:
+            logger.error("MCP: Find symbol failed", error=str(exc))
+            return {"symbols": [], "error": str(exc)}
+
+    def find_references(self, repo_id: str, symbol_name: str) -> dict[str, Any]:
+        """Find references by symbol name using the code graph."""
+        try:
+            references = self.graph_service.find_references(repo_id, symbol_name)
+            return {"references": [_model_dict(reference) for reference in references], "count": len(references)}
+        except Exception as exc:
+            logger.error("MCP: Find references failed", error=str(exc))
+            return {"references": [], "error": str(exc)}
+
+    def get_blast_radius(self, repo_id: str, symbol_name: str) -> dict[str, Any]:
+        """Return graph-backed blast radius for a symbol."""
+        try:
+            return self.graph_service.get_blast_radius(repo_id, symbol_name).to_dict()
+        except Exception as exc:
+            logger.error("MCP: Blast radius failed", error=str(exc))
+            return {"impacted_files": [], "associated_tests": [], "error": str(exc)}
 
 
 _mcp_handlers: MCPHandlers | None = None

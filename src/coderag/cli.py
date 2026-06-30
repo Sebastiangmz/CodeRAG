@@ -448,6 +448,86 @@ def context_pack(repo_id: str, query_text: str, top_k: int, max_tokens: int, max
         click.echo(snippet.get("content", ""))
         click.echo("```")
 
+
+
+@cli.command("find-symbol")
+@click.argument("repo_id")
+@click.argument("symbol_name")
+@click.option("--format", "output_format", type=click.Choice(["text", "json"]), default="text", help="Output format")
+def find_symbol(repo_id: str, symbol_name: str, output_format: str):
+    """Find indexed code graph symbols by exact name."""
+    _apply_config_to_env()
+
+    from coderag.mcp.handlers import get_mcp_handlers
+
+    result = get_mcp_handlers().find_symbol(repo_id=repo_id, symbol_name=symbol_name)
+    if result.get("error"):
+        click.echo(f"❌ Error: {result['error']}")
+        sys.exit(1)
+    if output_format == "json":
+        click.echo(json.dumps(result, indent=2))
+        return
+    click.echo(f"Symbols for {symbol_name}: {result.get('count', 0)}")
+    for symbol in result.get("symbols", []):
+        click.echo(f"- {symbol['name']} ({symbol['kind']}) {symbol['file_path']}:{symbol['start_line']}-{symbol['end_line']}")
+
+
+@cli.command("find-references")
+@click.argument("repo_id")
+@click.argument("symbol_name")
+@click.option("--format", "output_format", type=click.Choice(["text", "json"]), default="text", help="Output format")
+def find_references(repo_id: str, symbol_name: str, output_format: str):
+    """Find indexed code graph references to a symbol."""
+    _apply_config_to_env()
+
+    from coderag.mcp.handlers import get_mcp_handlers
+
+    result = get_mcp_handlers().find_references(repo_id=repo_id, symbol_name=symbol_name)
+    if result.get("error"):
+        click.echo(f"❌ Error: {result['error']}")
+        sys.exit(1)
+    if output_format == "json":
+        click.echo(json.dumps(result, indent=2))
+        return
+    click.echo(f"References for {symbol_name}: {result.get('count', 0)}")
+    for reference in result.get("references", []):
+        source = reference.get("source_name") or "module"
+        click.echo(
+            f"- {source} {reference['reference_kind']} {reference['symbol_name']} "
+            f"{reference['file_path']}:{reference['start_line']}-{reference['end_line']}"
+        )
+
+
+@cli.command("blast-radius")
+@click.argument("repo_id")
+@click.argument("symbol_name")
+@click.option("--format", "output_format", type=click.Choice(["text", "json"]), default="text", help="Output format")
+def blast_radius(repo_id: str, symbol_name: str, output_format: str):
+    """Return graph-backed blast radius evidence for a symbol."""
+    _apply_config_to_env()
+
+    from coderag.mcp.handlers import get_mcp_handlers
+
+    result = get_mcp_handlers().get_blast_radius(repo_id=repo_id, symbol_name=symbol_name)
+    if hasattr(result, "__await__"):
+        import asyncio
+
+        result = asyncio.run(result)
+    if result.get("error"):
+        click.echo(f"❌ Error: {result['error']}")
+        sys.exit(1)
+    if output_format == "json":
+        click.echo(json.dumps(result, indent=2))
+        return
+    click.echo(f"Blast radius for {symbol_name}")
+    click.echo("Impacted files:")
+    for file_path in result.get("impacted_files", []):
+        click.echo(f"- {file_path}")
+    if result.get("associated_tests"):
+        click.echo("Associated tests:")
+        for file_path in result["associated_tests"]:
+            click.echo(f"- {file_path}")
+
 @cli.command("repos")
 @click.option("--format", "output_format", type=click.Choice(["text", "json"]), default="text", help="Output format")
 def repos(output_format: str):

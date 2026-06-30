@@ -5,11 +5,17 @@ from typing import Any
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 
 from coderag.api.schemas import (
+    BlastRadiusResponse,
     CitationResponse,
     CitationVerificationResponse,
     ContextPackRequest,
     ContextPackResponse,
     ContextSnippetResponse,
+    FindReferencesResponse,
+    FindSymbolResponse,
+    GraphQueryRequest,
+    GraphReferenceResponse,
+    GraphSymbolResponse,
     IndexRepositoryRequest,
     IndexRepositoryResponse,
     ListRepositoriesResponse,
@@ -20,6 +26,7 @@ from coderag.api.schemas import (
 )
 from coderag.logging import get_logger
 from coderag.models.repository import Repository
+from coderag.services.graph import CodeGraphService
 from coderag.services.indexing import IndexingOptions, IndexingService
 from coderag.services.registry import RepositoryRegistry
 from coderag.services.retrieval import RetrievalService
@@ -30,6 +37,7 @@ router = APIRouter()
 registry = RepositoryRegistry()
 indexing_service = IndexingService(registry=registry)
 retrieval_service = RetrievalService(registry=registry)
+graph_service = CodeGraphService(registry=registry)
 
 
 def get_repo_or_404(repo_id: str) -> Repository:
@@ -208,6 +216,30 @@ async def context_pack(request: ContextPackRequest) -> ContextPackResponse:
         budget=pack.budget,
         capabilities=pack.capabilities,
     )
+
+
+@router.post("/graph/find-symbol", response_model=FindSymbolResponse)
+def find_symbol(request: GraphQueryRequest) -> FindSymbolResponse:
+    """Find graph symbols by name."""
+    repo = get_repo_or_404(request.repo_id)
+    symbols = graph_service.find_symbol(repo.id, request.symbol)
+    return FindSymbolResponse(symbols=[GraphSymbolResponse(**symbol.to_dict()) for symbol in symbols])
+
+
+@router.post("/graph/find-references", response_model=FindReferencesResponse)
+def find_references(request: GraphQueryRequest) -> FindReferencesResponse:
+    """Find graph references by symbol name."""
+    repo = get_repo_or_404(request.repo_id)
+    references = graph_service.find_references(repo.id, request.symbol)
+    return FindReferencesResponse(references=[GraphReferenceResponse(**reference.to_dict()) for reference in references])
+
+
+@router.post("/graph/blast-radius", response_model=BlastRadiusResponse)
+def get_blast_radius(request: GraphQueryRequest) -> BlastRadiusResponse:
+    """Return graph-backed blast radius evidence for a symbol."""
+    repo = get_repo_or_404(request.repo_id)
+    blast = graph_service.get_blast_radius(repo.id, request.symbol)
+    return BlastRadiusResponse(**blast.to_dict())
 
 
 @router.get("/repos", response_model=ListRepositoriesResponse)
